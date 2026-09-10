@@ -1,0 +1,56 @@
+{
+  "name": "galaxy-wars-blog",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "services": "docker compose up -d --wait postgres storage && docker compose run --rm bucket-init",
+    "dev:all": "npm run services && npm run db:migrate && npm run dev",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "password:hash": "tsx scripts/password.ts",
+    "storage:cleanup": "tsx scripts/cleanup.ts",
+    "storage:check": "tsx scripts/storage-check.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.0.0",
+    "dotenv": "^17.0.0",
+    "drizzle-orm": "0.45.2",
+    "next": "16.3.4",
+    "postgres": "^3.4.7",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sharp": "^0.35.4",
+    "zod": "^4.3.6",
+    "tsx": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "drizzle-kit": "^0.31.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.3.4",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0",
+    "prettier": "^3.8.0"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
+  }
+}

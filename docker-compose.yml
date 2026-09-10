@@ -1,0 +1,41 @@
+name: galaxy-wars-blog
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: blog
+      POSTGRES_PASSWORD: local-blog-password
+      POSTGRES_DB: galaxy_wars_blog
+    ports: ["127.0.0.1:5548:5432"]
+    volumes: ["blog-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blog -d galaxy_wars_blog"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  storage:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: local-blog
+      MINIO_ROOT_PASSWORD: local-blog-storage-password
+    ports: ["127.0.0.1:9018:9000", "127.0.0.1:9019:9001"]
+    volumes: ["blog-images:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  bucket-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      storage: { condition: service_healthy }
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "mc alias set local http://storage:9000 local-blog local-blog-storage-password && mc mb --ignore-existing local/galaxy-wars-blog",
+      ]
+volumes:
+  blog-db:
+  blog-images:
