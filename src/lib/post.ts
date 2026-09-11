@@ -18,6 +18,7 @@ export type Post = {
   videoId: string | null;
   published: boolean;
   publishedAt: string | null;
+  publishedDay: string | null;
   version: number;
   images: PostImage[];
 };

@@ -1,4 +1,5 @@
 "use client";
+import { postUrl, formatDay } from "@/lib/day";
 import { useEffect, useRef, useState } from "react";
 import { save } from "@/app/admin/actions";
 import { PostView } from "./PostView";
@@ -131,7 +132,7 @@ export function Editor({ initial }: { initial: Post }) {
     if (
       intent === "unpublish" &&
       !window.confirm(
-        "Unpublish this update? Its page and screenshots will no longer be available to readers.",
+        "Unpublish this update? It and its screenshots will no longer be available to readers. Other updates on the same day will stay published.",
       )
     )
       return;
@@ -395,11 +396,13 @@ export function Editor({ initial }: { initial: Post }) {
           <p className="muted">
             {message ||
               (saved.published
-                ? "Changes go live when you save."
-                : "Only you can see this until you publish.")}
+                ? `Grouped under ${formatDay(saved.publishedDay!)}. Changes go live when you save.`
+                : saved.publishedDay
+                  ? `Republishing returns this entry to ${formatDay(saved.publishedDay)}.`
+                  : "Publishing adds this entry to today’s page.")}
           </p>
           {saved.published && (
-            <a href={`/updates/${saved.slug}`} target="_blank" rel="noreferrer">
+            <a href={postUrl(saved)} target="_blank" rel="noreferrer">
               View public page ↗
             </a>
           )}

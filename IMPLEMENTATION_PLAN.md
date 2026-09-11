@@ -5,7 +5,7 @@ Date: 2026-09-10
 
 ## Goal
 
-Create a very simple public development blog for Galaxy Wars. Each change gets a compact, shareable one-page write-up with exactly two description paragraphs, a before screenshot, an after screenshot, and an optional YouTube link. The owner adds and edits material through a password-protected URL. Readers need no account or password.
+Create a very simple public development blog for Galaxy Wars. Each change gets a compact write-up with exactly two description paragraphs, a before screenshot, an after screenshot, and an optional YouTube link. As requested after the initial implementation, entries published on the same day share one public page. The owner adds and edits individual entries through a password-protected URL. Readers need no account or password.
 
 Use the visual language and deployment approach of the sibling `C:\Projects\trading-journal` project. Implementation was authorized after the initial planning session. Deployment is a separate step.
 
@@ -28,23 +28,21 @@ Reuse these conventions selectively. Do not copy trading features, sample data, 
 
 ### Public index: `/`
 
-- Galaxy Wars branding, a short introduction, and a chronological list of published updates, newest first.
-- Each card shows its title, publication date, a short excerpt from paragraph one, and the after screenshot as a thumbnail. The whole card links to the post.
-- Show 12 updates per page with ordinary older/newer navigation; no search, filters, or infinite scroll in the initial version.
+- Galaxy Wars branding, a short introduction, and a chronological list of publication days, newest first.
+- Each day has one card showing its date, entry count, up to three entry titles, and the latest entry's after screenshot. The whole card links to the daily page.
+- Show 12 whole days per page with ordinary older/newer navigation; no search, filters, or infinite scroll in the initial version.
 - A useful empty state appears until the first real post is published. Do not ship fabricated game progress as real content.
 
-### Public one-pager: `/updates/[slug]`
+### Public daily page: `/days/YYYY-MM-DD`
 
-1. Link back to all updates.
-2. Title and publication date.
-3. Paragraph one: what needed improvement and why.
-4. Paragraph two: what changed and what the player can now see or do.
-5. Two equally sized screenshot areas, explicitly labeled **Before** and **After**.
-6. Optional **Watch on YouTube** link.
+1. Link back to all days, one date heading, and the published entry count.
+2. For multiple entries, a short list of links to each entry's section.
+3. Each entry in first-publication order: its title, two paragraphs, equal-sized **Before** and **After** screenshot areas, and optional **Watch on YouTube** link.
+4. Each entry has a stable anchor. Existing `/updates/[slug]` URLs redirect to its section on the daily page.
 
 Use a centered reading column, with a wider screenshot row. Place screenshots side by side on desktop and stack Before above After on mobile. Preserve the entire image with its native aspect ratio; never crop away HUD or gameplay evidence. Clicking an image opens its full-resolution version. Reserve image space using stored dimensions to avoid layout jumps.
 
-"One-pager" means one focused page per change, not a forced single viewport or fixed print size. The page may scroll, especially on mobile.
+The daily page scrolls as needed, especially on mobile. Each entry retains its original content structure; grouping does not merge paragraphs, screenshots, or video links across entries.
 
 Use semantic server-rendered HTML, page-specific titles/descriptions, and share metadata referencing the after screenshot. Public content and image URLs must work without login. Keep administration out of public navigation and exclude admin pages from indexing; the URL's obscurity is not the security mechanism.
 
@@ -76,7 +74,9 @@ Drafts can be incomplete and are visible only to the owner. Publishing requires 
 
 Generate a readable slug from the title on first publication and add a short unique suffix on collision. Keep it stable through later title changes and unpublish/republish cycles. Set publication time on first publish and preserve it afterward. Slugs and draft IDs are never authorization mechanisms.
 
-Unpublish removes the page and its screenshots from public delivery while retaining them in the editor. Public post/image responses return 404 afterward. Previously downloaded or externally cached copies cannot be recalled. Permanent post deletion is deferred; unpublishing is sufficient for the first release.
+Also persist a publication day using `BLOG_TIME_ZONE` (default `America/Chicago`). This includes daylight-saving boundaries. Editing, republishing, and later timezone configuration changes preserve the assigned day. Migration `0001` backfills existing publication timestamps in the default Chicago timezone.
+
+Unpublish removes that entry and its screenshots from public delivery while retaining them in the editor. Other published entries keep the daily page available. Unpublishing the last entry removes its day from the index and makes that day URL return 404. Previously downloaded or externally cached copies cannot be recalled. Permanent post deletion is deferred; unpublishing is sufficient for the first release.
 
 ## Application and persistence
 
@@ -86,13 +86,13 @@ Keep server components, actions, and upload handlers thin. Put post validation, 
 
 ### Minimal records
 
-| Record            | Fields and constraints                                                                                                                                                                |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `posts`           | UUID, nullable unique slug until first publish, title, paragraph one, paragraph two, optional YouTube video ID, draft/published status, first publication time, created/updated times |
-| `post_images`     | UUID, post foreign key, before/after role, unique immutable object key, MIME type, width, height, byte size, alt text; unique `(post_id, role)`                                       |
-| `admin_sessions`  | Hashed random session token, expiry, credential-version fingerprint, created time                                                                                                     |
-| `login_attempts`  | Bounded persistent rate-limit counters/window timestamps; hashed client identifier                                                                                                    |
-| `storage_cleanup` | Unreferenced object keys awaiting deletion, timestamps and retry information                                                                                                          |
+| Record            | Fields and constraints                                                                                                                                                                             |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `posts`           | UUID, nullable unique slug until first publish, title, two paragraphs, optional YouTube video ID, draft/published status, first publication time, persisted publication day, created/updated times |
+| `post_images`     | UUID, post foreign key, before/after role, unique immutable object key, MIME type, width, height, byte size, alt text; unique `(post_id, role)`                                                    |
+| `admin_sessions`  | Hashed random session token, expiry, credential-version fingerprint, created time                                                                                                                  |
+| `login_attempts`  | Bounded persistent rate-limit counters/window timestamps; hashed client identifier                                                                                                                 |
+| `storage_cleanup` | Unreferenced object keys awaiting deletion, timestamps and retry information                                                                                                                       |
 
 The session and rate-limit records avoid another production service and continue to work across restarts. Cleanup records cover the database/object-store transaction boundary without requiring a queue platform.
 

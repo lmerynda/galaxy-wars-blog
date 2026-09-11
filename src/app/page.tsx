@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { publicPosts } from "@/server/posts";
-import { formatDate } from "@/lib/post";
+import { publicDays } from "@/server/posts";
+import { dayUrl, formatDay } from "@/lib/day";
 export const dynamic = "force-dynamic";
 export default async function Home({
   searchParams,
@@ -10,7 +10,7 @@ export default async function Home({
   const raw = (await searchParams).page;
   const page =
     raw && /^\d+$/.test(raw) ? Math.max(1, Math.min(100000, Number(raw))) : 1;
-  const { posts, hasMore } = await publicPosts(page);
+  const { days, hasMore } = await publicDays(page);
   return (
     <>
       <section className="home-hero">
@@ -48,15 +48,15 @@ export default async function Home({
           </h2>
           <span className="eyebrow muted">The development journal</span>
         </div>
-        {posts.length ? (
+        {days.length ? (
           <div className="post-grid">
-            {posts.map((post) => {
-              const image = post.images.find((i) => i.role === "after");
+            {days.map((day) => {
+              const image = day.image;
               return (
                 <Link
                   className="post-card"
-                  key={post.id}
-                  href={`/updates/${post.slug}`}
+                  key={day.day}
+                  href={dayUrl(day.day)}
                 >
                   <div className="card-image">
                     {image && (
@@ -68,19 +68,27 @@ export default async function Home({
                         loading="lazy"
                       />
                     )}
-                    <span className="image-badge">Before &amp; after</span>
+                    <span className="image-badge">
+                      {day.count} {day.count === 1 ? "update" : "updates"}
+                    </span>
                   </div>
                   <div className="card-body">
-                    <time
-                      className="eyebrow muted"
-                      dateTime={post.publishedAt!}
-                    >
-                      {formatDate(post.publishedAt)}
-                    </time>
-                    <h3>{post.title}</h3>
-                    <p>{post.paragraphOne}</p>
+                    <span className="eyebrow muted">Daily field notes</span>
+                    <h3>
+                      <time dateTime={day.day}>{formatDay(day.day)}</time>
+                    </h3>
+                    <ul className="day-card-titles">
+                      {day.titles.map((title, index) => (
+                        <li key={index}>{title}</li>
+                      ))}
+                    </ul>
+                    {day.count > day.titles.length && (
+                      <p className="day-more">
+                        And {day.count - day.titles.length} more updates
+                      </p>
+                    )}
                     <span className="card-link">
-                      Read the update <span aria-hidden="true">↗</span>
+                      Read the day’s updates <span aria-hidden="true">↗</span>
                     </span>
                   </div>
                 </Link>
@@ -113,7 +121,7 @@ export default async function Home({
           <nav className="pagination" aria-label="Update pages">
             {page > 1 ? (
               <Link className="button" href={`/?page=${page - 1}`}>
-                ← Newer updates
+                ← Newer days
               </Link>
             ) : (
               <span />
@@ -121,7 +129,7 @@ export default async function Home({
             <span className="muted">Page {page}</span>
             {hasMore ? (
               <Link className="button" href={`/?page=${page + 1}`}>
-                Older updates →
+                Older days →
               </Link>
             ) : (
               <span />

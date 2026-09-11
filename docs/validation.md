@@ -4,17 +4,17 @@ Implemented the agreed blog scope in a single Next.js application. No Railway re
 
 ## Checks
 
-| Check                   | Result                                                                                                                                 |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Dependency installation | `npm ci` succeeds with the committed lockfile                                                                                          |
-| Static checks           | ESLint and strict TypeScript pass                                                                                                      |
-| Unit tests              | 15 passing: publication inputs, video links, password hashes, origin/redirect validation, image format/decode/size/animation rejection |
-| Integration tests       | 7 passing against real local PostgreSQL and MinIO                                                                                      |
-| Production build        | Next.js production build succeeds, including with an unreachable database URL                                                          |
-| Browser acceptance      | Full owner/anonymous flow passes in headless Microsoft Edge against the production build                                               |
-| Restart persistence     | Separate application process started, stopped, and started again; public post and full image bytes remain available                    |
-| Dependency audit        | 0 reported vulnerabilities                                                                                                             |
-| Formatting              | Prettier check passes                                                                                                                  |
+| Check                   | Result                                                                                                                           |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Dependency installation | `npm ci` succeeds with the committed lockfile                                                                                    |
+| Static checks           | ESLint and strict TypeScript pass                                                                                                |
+| Unit tests              | 29 passing: content/security/image validation plus calendar dates, timezones, midnight, daylight-saving boundaries, and day URLs |
+| Integration tests       | 10 passing against real local PostgreSQL and MinIO, including grouping, whole-day pagination, and migration backfill             |
+| Production build        | Next.js production build succeeds, including with an unreachable database URL                                                    |
+| Browser acceptance      | 2 passing scenarios in headless Microsoft Edge: the owner/anonymous flow and multiple entries on one daily page                  |
+| Restart persistence     | Separate application process started, stopped, and started again; public post and full image bytes remain available              |
+| Dependency audit        | 0 reported vulnerabilities                                                                                                       |
+| Formatting              | Prettier check passes                                                                                                            |
 
 Integration tests cover unauthorized writes, private images, publication, staged replacement privacy, stable slugs/dates, concurrent slug allocation, stale saves, foreign-image rejection, injected storage and database failures, cleanup retries, persisted login limits, session expiry/logout, and password rotation.
 
@@ -43,6 +43,14 @@ Generated captures are local, ignored artifacts:
 
 Reproduce them with the environment variables and commands in the README. CI uses generated images unless real screenshot paths are supplied, and uploads its browser artifacts for inspection.
 
-## Deployment work remaining
+## Daily grouping follow-up
+
+Entries now share `/days/YYYY-MM-DD` pages, assigned at first publication in `America/Chicago` by default. Verified that two entries produce one index card and one daily page, with their own titles, paragraphs, screenshot pairs, optional videos, and jump links. Existing entry URLs redirect to their daily-page anchors. Draft entries remain hidden, unpublishing one entry leaves the others visible, and unpublishing the final entry removes the day.
+
+The PostgreSQL tests also verify persisted days across editing/republishing and timezone changes, chronological entry ordering, pagination by whole days, and migration of old published/unpublished entries across Chicago midnight. Unit tests cover winter/summer midnight, daylight-saving transitions, invalid dates, and leap years.
+
+Reviewed `artifacts/visual/day-desktop.png` at 1440px and `artifacts/visual/day-mobile.png` at 390px, plus the one-card/two-entry index in `artifacts/visual/daily-home-desktop.png`. The two-entry browser fixture reuses the same real ammunition-market pair to test grouping; it is not two newly published game changes. The new migration was applied locally, and the production build passes.
+
+## Railway deployment still pending
 
 The owner still needs to choose a production password, provision Railway PostgreSQL and a private bucket, set the service variables/domain, and deploy. Then perform the health, storage, anonymous-reading, and redeploy smoke checks documented in the README. Backup restoration instructions are provided; an actual production backup/restore drill has not been performed.

@@ -42,7 +42,7 @@ export default async function Admin() {
                   {post.published ? "Published" : "Draft"}
                 </span>
                 <h3>{post.title || "Untitled update"}</h3>
-                <p className="muted">{formatDate(post.publishedAt)}</p>
+                <p className="muted">{formatDate(post.publishedDay)}</p>
               </div>
               <span className="muted">Edit →</span>
             </Link>

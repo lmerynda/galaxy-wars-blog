@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
   check,
+  date,
 } from "drizzle-orm/pg-core";
 
 export const posts = pgTable(
@@ -22,6 +23,7 @@ export const posts = pgTable(
     videoId: text("video_id"),
     published: boolean().notNull().default(false),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishedDay: date("published_day"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -33,8 +35,11 @@ export const posts = pgTable(
   (t) => [
     check(
       "publication_metadata",
-      sql`not ${t.published} or (${t.slug} is not null and ${t.publishedAt} is not null)`,
+      sql`not ${t.published} or (${t.slug} is not null and ${t.publishedAt} is not null and ${t.publishedDay} is not null)`,
     ),
+    index("published_days")
+      .on(t.publishedDay, t.publishedAt)
+      .where(sql`${t.published}`),
   ],
 );
 

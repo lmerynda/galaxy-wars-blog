@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "./db";
 import { requireOwner } from "./auth";
+import { isDay, publicationDay } from "../lib/day";
 import {
   InputError,
   slugBase,
@@ -19,6 +20,7 @@ type PostRow = {
   video_id: string | null;
   published: boolean;
   published_at: Date | null;
+  published_day: string | null;
   version: number;
 };
 type ImageRow = {
@@ -30,7 +32,7 @@ type ImageRow = {
   alt: string;
 };
 const fields =
-  "id, slug, title, paragraph_one, paragraph_two, video_id, published, published_at, version";
+  "id, slug, title, paragraph_one, paragraph_two, video_id, published, published_at, published_day::text as published_day, version";
 async function withImages(rows: PostRow[]): Promise<Post[]> {
   if (!rows.length) return [];
   const sql = db();
@@ -46,6 +48,7 @@ async function withImages(rows: PostRow[]): Promise<Post[]> {
     videoId: r.video_id,
     published: r.published,
     publishedAt: r.published_at?.toISOString() ?? null,
+    publishedDay: r.published_day,
     version: r.version,
     images: images
       .filter((i) => i.post_id === r.id)
@@ -59,15 +62,43 @@ async function withImages(rows: PostRow[]): Promise<Post[]> {
       })),
   }));
 }
-export async function publicPosts(page = 1) {
+export async function publicDays(page = 1) {
   const sql = db();
-  const rows = await sql<
-    PostRow[]
-  >`select ${sql.unsafe(fields)} from posts where published order by published_at desc, id desc limit 13 offset ${(page - 1) * 12}`;
+  const summaries = await sql<
+    { day: string; count: number; titles: string[] }[]
+  >`
+    select published_day::text as day, count(*)::int as count,
+      (array_agg(title order by published_at, id))[1:3] as titles
+    from posts where published group by published_day
+    order by published_day desc limit 13 offset ${(page - 1) * 12}`;
+  const days = summaries.slice(0, 12);
+  const covers = days.length
+    ? await withImages(
+        await sql<PostRow[]>`
+    select distinct on (posts.published_day) ${sql.unsafe(fields)} from posts
+    where published and published_day in ${sql(days.map((day) => day.day))}
+    order by posts.published_day desc, published_at desc, id desc`,
+      )
+    : [];
   return {
-    posts: await withImages(rows.slice(0, 12)),
-    hasMore: rows.length > 12,
+    days: days.map((day) => ({
+      ...day,
+      image: covers
+        .find((post) => post.publishedDay === day.day)
+        ?.images.find((image) => image.role === "after"),
+    })),
+    hasMore: summaries.length > 12,
   };
+}
+export async function publicDay(day: string) {
+  if (!isDay(day)) return null;
+  const sql = db();
+  const posts = await withImages(
+    await sql<PostRow[]>`
+    select ${sql.unsafe(fields)} from posts where published and published_day = ${day}
+    order by published_at, id`,
+  );
+  return posts.length ? { day, posts } : null;
 }
 export async function publicPost(slug: string) {
   const sql = db();
@@ -152,9 +183,16 @@ export async function savePost(token: string | undefined, input: unknown) {
       if ((await tx`select id from posts where slug = ${slug}`).length)
         slug = `${slug}-${randomUUID().slice(0, 8)}`;
     }
+    const publishedAt =
+      post.published_at ?? (data.intent === "publish" ? new Date() : null);
+    const publishedDay =
+      post.published_day ??
+      (publishedAt
+        ? publicationDay(publishedAt, process.env.BLOG_TIME_ZONE || undefined)
+        : null);
     await tx`update posts set title = ${data.title}, paragraph_one = ${data.paragraphOne}, paragraph_two = ${data.paragraphTwo}, video_id = ${data.videoId},
       slug = ${slug}, published = ${data.intent === "publish"},
-      published_at = ${post.published_at ?? (data.intent === "publish" ? new Date() : null)}, updated_at = now(), version = version + 1 where id = ${data.id}`;
+      published_at = ${publishedAt}, published_day = ${publishedDay}, updated_at = now(), version = version + 1 where id = ${data.id}`;
   });
   return (await ownerPost(data.id, token))!;
 }

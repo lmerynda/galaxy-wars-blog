@@ -1,27 +1,48 @@
 import { formatDate, videoUrl, type Post } from "@/lib/post";
+import { entryAnchor } from "@/lib/day";
 
 export function PostView({
   post,
   preview = false,
+  entryNumber,
 }: {
   post: Post;
   preview?: boolean;
+  entryNumber?: number;
 }) {
+  const Heading = entryNumber ? "h2" : "h1";
   return (
-    <article className="post-view">
+    <article
+      className={`post-view ${entryNumber ? "day-entry" : ""}`}
+      id={entryNumber ? entryAnchor(post) : undefined}
+    >
       <header className="post-header">
         <div className="eyebrow">
-          {preview ? "Preview · only visible to you" : "Development update"}
+          {preview
+            ? "Preview · only visible to you"
+            : entryNumber
+              ? `${String(entryNumber).padStart(2, "0")} / Development update`
+              : "Development update"}
         </div>
-        <h1>{post.title || "Your next chapter"}</h1>
-        <div className="post-meta">
-          <span className="status-dot" />{" "}
-          <time dateTime={post.publishedAt ?? undefined}>
-            {formatDate(post.publishedAt)}
-          </time>
-          <span className="meta-divider">/</span>
-          <span>Galaxy Wars</span>
-        </div>
+        <Heading>{post.title || "Your next chapter"}</Heading>
+        {entryNumber ? (
+          <a
+            className="entry-permalink"
+            href={`#${entryAnchor(post)}`}
+            aria-label={`Link to entry: ${post.title}`}
+          >
+            Link to this update ↗
+          </a>
+        ) : (
+          <div className="post-meta">
+            <span className="status-dot" />{" "}
+            <time dateTime={post.publishedDay ?? undefined}>
+              {formatDate(post.publishedDay)}
+            </time>
+            <span className="meta-divider">/</span>
+            <span>Galaxy Wars</span>
+          </div>
+        )}
       </header>
       <div className="post-copy">
         <p>
@@ -82,10 +103,12 @@ export function PostView({
           </span>
         </a>
       )}
-      <div className="post-end">
-        <span className="star-mark">✳</span>
-        <span>One change. A better galaxy.</span>
-      </div>
+      {!entryNumber && (
+        <div className="post-end">
+          <span className="star-mark">✳</span>
+          <span>One change. A better galaxy.</span>
+        </div>
+      )}
     </article>
   );
 }

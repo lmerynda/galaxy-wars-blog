@@ -177,9 +177,9 @@ test("owner publishes a screenshot story and anonymous readers can browse it", a
   });
   await reader.goto("/");
   await expect(
-    reader.getByRole("heading", {
-      name: "Ammunition gets a physical identity",
-    }),
+    reader
+      .locator(".post-card")
+      .getByText("Ammunition gets a physical identity", { exact: true }),
   ).toBeVisible();
   await reader.screenshot({
     path: "artifacts/visual/home-desktop.png",
@@ -246,5 +246,182 @@ test("owner publishes a screenshot story and anonymous readers can browse it", a
   await page.goto(editUrl);
   await expect(page).toHaveURL(/\/admin\/login/);
   expect(errors).toEqual([]);
+  await anonymous.close();
+});
+
+test("multiple published entries share a daily page and remain independently editable", async ({
+  page,
+  browser,
+}) => {
+  await page.goto("/admin/login");
+  await page.getByLabel("Owner password").fill("local-e2e-password-only");
+  await page.getByRole("button", { name: "Enter the studio" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  const generated = await sharp({
+    create: { width: 1280, height: 720, channels: 3, background: "#243c2e" },
+  })
+    .png()
+    .toBuffer();
+  const before = process.env.E2E_BEFORE_IMAGE
+    ? await readFile(process.env.E2E_BEFORE_IMAGE)
+    : generated;
+  const after = process.env.E2E_AFTER_IMAGE
+    ? await readFile(process.env.E2E_AFTER_IMAGE)
+    : generated;
+  async function publish(
+    title: string,
+    paragraphOne: string,
+    paragraphTwo: string,
+    video = false,
+  ) {
+    await page.goto("/admin/new");
+    await page.getByRole("button", { name: "Start writing" }).click();
+    await page.getByLabel("Update title").fill(title);
+    await page.getByLabel("What needed improvement?").fill(paragraphOne);
+    await page.getByLabel("What changed?").fill(paragraphTwo);
+    await page.locator("#beforeFile").setInputFiles({
+      name: "before.png",
+      mimeType: "image/png",
+      buffer: before,
+    });
+    await expect(page.getByAltText("before upload preview")).toBeVisible();
+    await page.locator("#afterFile").setInputFiles({
+      name: "after.png",
+      mimeType: "image/png",
+      buffer: after,
+    });
+    await expect(page.getByAltText("after upload preview")).toBeVisible();
+    await page
+      .locator("#beforeAlt")
+      .fill("Original ammunition market with text-only rows.");
+    await page
+      .locator("#afterAlt")
+      .fill("Updated market with miniatures and separated purchase controls.");
+    if (video)
+      await page
+        .getByLabel("YouTube video link")
+        .fill("https://youtu.be/dQw4w9WgXcQ");
+    await page.getByRole("button", { name: "Publish update" }).click();
+    await expect(
+      page.getByText("Published and saved. Your update is live."),
+    ).toBeVisible();
+    return {
+      editUrl: page.url(),
+      publicUrl: (await page
+        .getByRole("link", { name: "View public page" })
+        .getAttribute("href"))!,
+      imageUrl: (await page
+        .getByAltText("after upload preview")
+        .getAttribute("src"))!,
+    };
+  }
+  const first = await publish(
+    "Ammunition miniatures",
+    "Text-only listings made ammunition types difficult to distinguish at a glance.",
+    "Physical miniatures give laser charges, precision charges, and rockets a recognizable identity.",
+    true,
+  );
+  const second = await publish(
+    "Room for purchase controls",
+    "Fixed-width rows could clip long labels and crowd the controls on smaller screens.",
+    "The market now adapts each row to the available width, keeping names, details, and purchase buttons separate.",
+  );
+  const dayPath = first.publicUrl.split("#")[0];
+  expect(dayPath).toMatch(/^\/days\/\d{4}-\d{2}-\d{2}$/);
+  expect(second.publicUrl.split("#")[0]).toBe(dayPath);
+  expect(second.publicUrl).not.toBe(first.publicUrl);
+  const anonymous = await browser.newContext({
+    baseURL: "http://localhost:3018",
+  });
+  const reader = await anonymous.newPage();
+  await reader.setViewportSize({ width: 1440, height: 1000 });
+  await reader.goto("/");
+  await expect(reader.locator(".post-card")).toHaveCount(1);
+  await expect(reader.locator(".image-badge")).toHaveText("2 updates");
+  await expect(reader.locator(".post-card")).toHaveAttribute("href", dayPath);
+  await reader.screenshot({
+    path: "artifacts/visual/daily-home-desktop.png",
+    fullPage: true,
+  });
+  await reader.locator(".post-card").click();
+  await expect(reader.locator("h1")).toHaveCount(1);
+  await expect(reader.locator(".day-entry h2")).toHaveText([
+    "Ammunition miniatures",
+    "Room for purchase controls",
+  ]);
+  await expect(reader.locator(".post-copy p")).toHaveCount(4);
+  await expect(reader.locator(".comparison img")).toHaveCount(4);
+  await expect(reader.locator(".video-link")).toHaveCount(1);
+  await expect(reader.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    `http://localhost:3018${dayPath}`,
+  );
+  await expect
+    .poll(() =>
+      reader
+        .locator(".comparison img")
+        .evaluateAll((images) =>
+          images.every((image) => (image as HTMLImageElement).naturalWidth > 0),
+        ),
+    )
+    .toBe(true);
+  await reader.screenshot({
+    path: "artifacts/visual/day-desktop.png",
+    fullPage: true,
+  });
+  await reader
+    .getByRole("navigation", { name: "This day’s updates" })
+    .getByRole("link", { name: /Room for purchase controls/ })
+    .click();
+  await expect(reader).toHaveURL(`http://localhost:3018${second.publicUrl}`);
+  await reader.goto("/updates/ammunition-miniatures");
+  await expect(reader).toHaveURL(`http://localhost:3018${first.publicUrl}`);
+  await reader.goto(dayPath);
+  await reader.setViewportSize({ width: 390, height: 844 });
+  await reader.screenshot({
+    path: "artifacts/visual/day-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await reader.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  // A third private draft must not appear in the day's page or its count.
+  await page.goto("/admin/new");
+  await page.getByRole("button", { name: "Start writing" }).click();
+  await page.getByLabel("Update title").fill("Private third entry");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(
+    page.getByText("Draft saved. Only you can see it."),
+  ).toBeVisible();
+  await reader.reload();
+  await expect(reader.locator(".day-entry")).toHaveCount(2);
+  await expect(reader.getByText("Private third entry")).toHaveCount(0);
+  await page.goto(second.editUrl);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Unpublish", exact: true }).click();
+  await expect(
+    page.getByText("Unpublished. Your post is now a private draft."),
+  ).toBeVisible();
+  await reader.reload();
+  await expect(reader.locator(".day-entry h2")).toHaveText([
+    "Ammunition miniatures",
+  ]);
+  expect((await anonymous.request.get(second.imageUrl)).status()).toBe(404);
+  await reader.goto("/");
+  await expect(reader.locator(".image-badge")).toHaveText("1 update");
+  await page.goto(first.editUrl);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Unpublish", exact: true }).click();
+  await expect(
+    page.getByText("Unpublished. Your post is now a private draft."),
+  ).toBeVisible();
+  expect((await anonymous.request.get(dayPath)).status()).toBe(404);
+  expect(
+    (await anonymous.request.get("/updates/ammunition-miniatures")).status(),
+  ).toBe(404);
+  await reader.reload();
+  await expect(reader.locator(".post-card")).toHaveCount(0);
   await anonymous.close();
 });
