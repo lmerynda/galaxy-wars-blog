@@ -58,7 +58,7 @@ export async function uploadImage(
   await requireOwner(token);
   if (
     !z.uuid().safeParse(postId).success ||
-    !["before", "after"].includes(role)
+    !["before", "after", "gallery"].includes(role)
   )
     throw new InputError("Invalid screenshot destination.");
   const sql = transaction ?? db();

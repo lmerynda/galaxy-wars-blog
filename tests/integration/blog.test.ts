@@ -100,7 +100,7 @@ it("publishes, stages replacements privately, preserves slugs/dates, rejects sta
   ).toBe(after.id);
   await expect(
     savePost(token, { ...input, version: post.version, afterId: before.id }),
-  ).rejects.toThrow(/does not belong/);
+  ).rejects.toThrow(/does not belong|only once/);
   const originalDate = post.publishedAt;
   const originalDay = post.publishedDay;
   post = await savePost(token, {

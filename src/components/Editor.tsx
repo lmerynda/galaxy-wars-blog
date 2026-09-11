@@ -2,6 +2,7 @@
 import { postUrl, formatDay } from "@/lib/day";
 import { useEffect, useRef, useState } from "react";
 import { save } from "@/app/admin/actions";
+import { Discussion } from "./Discussion";
 import { PostView } from "./PostView";
 import {
   videoUrl,
@@ -24,6 +25,7 @@ function fields(post: Post): PostInput {
     afterId: post.images.find((i) => i.role === "after")?.id ?? "",
     beforeAlt: post.images.find((i) => i.role === "before")?.alt ?? "",
     afterAlt: post.images.find((i) => i.role === "after")?.alt ?? "",
+    images: post.images.map(({ id, alt }) => ({ id, alt })),
     intent: post.published ? "publish" : "draft",
   };
 }
@@ -119,9 +121,12 @@ export function Editor({ initial }: { initial: Post }) {
     setProgress(0);
     try {
       const image = await upload(initial.id, role, file, setProgress);
-      setImages((prev) => [...prev.filter((i) => i.role !== role), image]);
-      change(`${role}Id`, image.id);
-      setMessage("Screenshot ready. Save the post to keep this replacement.");
+      setImages((prev) => [...prev, image]);
+      setForm((prev) => ({
+        ...prev,
+        images: [...(prev.images ?? []), { id: image.id, alt: "" }],
+      }));
+      setMessage("Image ready. Save the post to keep it.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
@@ -174,7 +179,10 @@ export function Editor({ initial }: { initial: Post }) {
     paragraphOne: form.paragraphOne.replace(/\s+/g, " ").trim(),
     paragraphTwo: form.paragraphTwo.replace(/\s+/g, " ").trim(),
     videoId: previewVideo,
-    images: images.map((i) => ({ ...i, alt: form[`${i.role}Alt`] })),
+    images: (form.images ?? []).map((selection) => ({
+      ...images.find((image) => image.id === selection.id)!,
+      alt: selection.alt,
+    })),
   };
   return (
     <>
@@ -284,68 +292,91 @@ export function Editor({ initial }: { initial: Post }) {
                   PNG, JPEG or WebP · up to 10 MiB each
                 </span>
               </div>
+              <label htmlFor="galleryFiles">Add images</label>
+              <input
+                id="galleryFiles"
+                type="file"
+                multiple
+                accept="image/png,image/jpeg,image/webp"
+                onChange={async (event) => {
+                  const files = Array.from(event.target.files ?? []);
+                  event.target.value = "";
+                  for (const file of files) await selectImage("gallery", file);
+                }}
+              />
+              {uploading && (
+                <p role="status">
+                  {progress < 100
+                    ? `Uploading… ${progress}%`
+                    : "Validating image…"}
+                </p>
+              )}
               <div className="text-grid">
-                {(["before", "after"] as const).map((role) => {
-                  const image = images.find((i) => i.role === role);
+                {(form.images ?? []).map((selection, index) => {
+                  const image = images.find(
+                    (item) => item.id === selection.id,
+                  )!;
                   return (
-                    <div className="upload-column" key={role}>
-                      <label className="upload-label" htmlFor={`${role}File`}>
-                        <span className="eyebrow">{role}</span>
-                        <span className="field-hint">
-                          {image
-                            ? "Choose a file to replace this screenshot"
-                            : "Choose a screenshot"}
-                        </span>
-                      </label>
+                    <div className="upload-column" key={image.id}>
                       <div className="upload-preview">
-                        {image ? (
-                          <img
-                            src={image.url}
-                            alt={`${role} upload preview`}
-                            width={image.width}
-                            height={image.height}
-                          />
-                        ) : (
-                          <span>
-                            <span className="image-symbol">＋</span>The {role}{" "}
-                            view
-                          </span>
-                        )}
+                        <img
+                          src={image.url}
+                          alt={selection.alt || "Image preview"}
+                          width={image.width}
+                          height={image.height}
+                        />
                       </div>
-                      <input
-                        className="file-input"
-                        id={`${role}File`}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(e) => {
-                          void selectImage(role, e.target.files?.[0]);
-                          e.target.value = "";
-                        }}
-                      />
-                      {uploading === role && (
-                        <p role="status" className="upload-progress">
-                          {progress < 100
-                            ? `Uploading… ${progress}%`
-                            : "Validating screenshot…"}
-                        </p>
-                      )}
-                      <label htmlFor={`${role}Alt`}>
-                        Image description
-                        <span className="field-hint">
-                          Help readers understand what’s visible.
-                        </span>
+                      <label htmlFor={`caption-${image.id}`}>
+                        Image {index + 1} description
                       </label>
                       <input
-                        id={`${role}Alt`}
-                        value={form[`${role}Alt`]}
-                        onChange={(e) => change(`${role}Alt`, e.target.value)}
+                        id={`caption-${image.id}`}
+                        value={selection.alt}
                         maxLength={200}
-                        placeholder={
-                          role === "before"
-                            ? "Describe the original view"
-                            : "Describe the improved view"
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            images: prev.images!.map((item) =>
+                              item.id === image.id
+                                ? { ...item, alt: event.target.value }
+                                : item,
+                            ),
+                          }))
                         }
                       />
+                      <div className="actions">
+                        <button
+                          type="button"
+                          className="button"
+                          disabled={index === 0}
+                          onClick={() =>
+                            setForm((prev) => {
+                              const next = [...prev.images!];
+                              [next[index - 1], next[index]] = [
+                                next[index],
+                                next[index - 1],
+                              ];
+                              return { ...prev, images: next };
+                            })
+                          }
+                        >
+                          Move up
+                        </button>
+                        <button
+                          type="button"
+                          className="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              images: prev.images!.filter(
+                                (item) => item.id !== image.id,
+                              ),
+                            }))
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -377,6 +408,7 @@ export function Editor({ initial }: { initial: Post }) {
           </button>
         </form>
       </div>
+      {!preview && <Discussion postId={initial.id} admin />}
       {preview && (
         <div className="preview-surface panel">
           <PostView post={previewPost} preview />

@@ -18,6 +18,12 @@ class ApiError extends Error {
 }
 const content = postInput
   .omit({ id: true, version: true, intent: true })
+  .extend({
+    beforeId: postInput.shape.beforeId.default(""),
+    afterId: postInput.shape.afterId.default(""),
+    beforeAlt: postInput.shape.beforeAlt.default(""),
+    afterAlt: postInput.shape.afterAlt.default(""),
+  })
   .strict();
 const revision = z.object({ version: z.number().int().nonnegative() }).strict();
 function result(post: Post) {
@@ -88,7 +94,7 @@ export async function handleApi(request: Request, path: string[]) {
       request.method === "POST" &&
       path.length === 4 &&
       action === "images" &&
-      ["before", "after"].includes(role);
+      ["before", "after", "gallery"].includes(role);
     if (!creating && !editing && !publishing && !uploading)
       throw new ApiError(404, "Endpoint not found.");
     const key = request.headers.get("idempotency-key") ?? "";
@@ -105,7 +111,7 @@ export async function handleApi(request: Request, path: string[]) {
       throw new ApiError(415, "Use application/json.");
     const bytes = await readBody(
       request,
-      uploading ? MAX_IMAGE_BYTES : 16 * 1024,
+      uploading ? MAX_IMAGE_BYTES : 256 * 1024,
     );
     let input: unknown;
     if (!uploading) {
@@ -198,6 +204,9 @@ export async function handleApi(request: Request, path: string[]) {
             await savePost(
               credential,
               {
+                images: publishing
+                  ? post.images.map(({ id, alt }) => ({ id, alt }))
+                  : undefined,
                 title: post.title,
                 paragraphOne: post.paragraphOne,
                 paragraphTwo: post.paragraphTwo,
@@ -233,7 +242,9 @@ export async function handleApi(request: Request, path: string[]) {
         method: request.method,
         postId: z.uuid().safeParse(path[1]).success ? path[1] : undefined,
         action: ["images", "publish"].includes(path[2]) ? path[2] : "posts",
-        role: ["before", "after"].includes(path[3]) ? path[3] : undefined,
+        role: ["before", "after", "gallery"].includes(path[3])
+          ? path[3]
+          : undefined,
         status: 503,
         durationMs: Date.now() - started,
         error: errorDetails(error),

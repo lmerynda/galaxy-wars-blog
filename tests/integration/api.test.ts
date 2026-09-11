@@ -63,7 +63,7 @@ it("requires a separate token, fails closed and rejects invalid requests", async
   ).toBe(400);
   expect((await call(["posts"], "POST", draft, "short")).status).toBe(400);
   expect(
-    (await call(["posts"], "POST", { ...draft, title: "x".repeat(20000) }))
+    (await call(["posts"], "POST", { ...draft, title: "x".repeat(300000) }))
       .status,
   ).toBe(413);
 });
@@ -122,10 +122,10 @@ it("uploads privately, saves a draft, publishes explicitly and rejects stale wri
   expect(
     (
       await call(["posts", post.id, "publish"], "POST", {
-        version: post.version,
+        version: post.version + 1,
       })
     ).status,
-  ).toBe(400);
+  ).toBe(409);
   const png = await sharp({
     create: { width: 64, height: 64, channels: 3, background: "#234567" },
   })
@@ -194,4 +194,56 @@ it("uploads privately, saves a draft, publishes explicitly and rejects stale wri
   process.env.BLOG_API_TOKEN = "rotated-" + token;
   expect((await call(["posts", post.id], "GET")).status).toBe(401);
   process.env.BLOG_API_TOKEN = token;
+});
+
+it("accepts an ordered API gallery without legacy pair fields", async () => {
+  const content = {
+    title: "Three proposals",
+    paragraphOne: "Original design.",
+    paragraphTwo: "Three alternatives.",
+    youtubeUrl: "",
+    images: [],
+  };
+  const { post } = await (await call(["posts"], "POST", content)).json();
+  const png = await sharp({
+    create: { width: 32, height: 32, channels: 3, background: "#445566" },
+  })
+    .png()
+    .toBuffer();
+  const images = [];
+  for (let i = 0; i < 3; i++) {
+    const response = await handleApi(
+      new Request("http://localhost/api", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "image/png",
+          "idempotency-key": randomUUID(),
+        },
+        body: png,
+      }),
+      ["posts", post.id, "images", "gallery"],
+    );
+    expect(response.status).toBe(200);
+    const { image } = await response.json();
+    images.push({ id: image.id, alt: `Proposal ${i + 1}` });
+  }
+  const ordered = images.reverse();
+  const response = await call(["posts", post.id], "PUT", {
+    ...content,
+    version: post.version,
+    images: ordered,
+  });
+  expect(response.status).toBe(200);
+  const saved = await response.json();
+  expect(saved.post.images.map((i: { id: string }) => i.id)).toEqual(
+    ordered.map((i) => i.id),
+  );
+  const published = await (
+    await call(["posts", post.id, "publish"], "POST", {
+      version: saved.post.version,
+    })
+  ).json();
+  expect(published.post.images).toHaveLength(3);
+  expect(published.post.published).toBe(true);
 });

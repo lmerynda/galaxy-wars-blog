@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export type Role = "before" | "after";
+export type Role = "before" | "after" | "gallery";
 export type PostImage = {
   id: string;
   role: Role;
@@ -69,6 +69,9 @@ export const postInput = z.object({
   afterId: z.union([z.uuid(), z.literal("")]),
   beforeAlt: z.string().trim().max(200),
   afterAlt: z.string().trim().max(200),
+  images: z
+    .array(z.object({ id: z.uuid(), alt: z.string().trim().max(200) }))
+    .optional(),
   intent: z.enum(["draft", "publish", "unpublish"]),
 });
 export type PostInput = z.input<typeof postInput>;
@@ -80,21 +83,27 @@ export function validatePost(input: unknown) {
     );
   const data = parsed.data;
   const videoId = youtubeId(data.youtubeUrl);
+  const images =
+    data.images ??
+    [
+      { id: data.beforeId, alt: data.beforeAlt },
+      { id: data.afterId, alt: data.afterAlt },
+    ].filter((image) => image.id);
+  if (new Set(images.map((image) => image.id)).size !== images.length)
+    throw new InputError("Choose each image only once.");
   if (
     data.intent === "publish" &&
     (!data.title ||
       !data.paragraphOne ||
       !data.paragraphTwo ||
-      !data.beforeId ||
-      !data.afterId ||
-      !data.beforeAlt ||
-      !data.afterAlt)
+      (data.images === undefined && (!data.beforeId || !data.afterId)) ||
+      images.some((image) => !image.alt))
   ) {
     throw new InputError(
-      "To publish, add a title, both paragraphs, both screenshots, and their descriptions.",
+      "To publish, add a title, both paragraphs, and descriptions for every image.",
     );
   }
-  return { ...data, videoId };
+  return { ...data, videoId, images, legacyImages: data.images === undefined };
 }
 export function slugBase(title: string) {
   return (

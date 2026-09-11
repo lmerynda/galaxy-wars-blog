@@ -17,7 +17,7 @@ All requests use `Authorization: Bearer <token>`. No cookies or Origin header ar
 3. `PUT /api/v1/posts/{id}` saves the complete JSON content below, including the latest `version` and uploaded image IDs. This is a full replacement, not a partial patch. It cannot publish or change a published entry.
 4. Share `previewUrl` with the owner for review. The editor includes its usual preview.
 5. After explicit publishing approval, `GET /api/v1/posts/{id}` retrieves the current post and version. Confirm the content is still the approved version; if it changed, seek a fresh review.
-6. `POST /api/v1/posts/{id}/publish` with `{ "version": 2 }` publishes the saved content and returns `publicUrl`. Both paragraphs, images, and alt descriptions must be present. The first publication date determines the daily page.
+6. `POST /api/v1/posts/{id}/publish` with `{ "version": 2 }` publishes the saved content and returns `publicUrl`. Both paragraphs and descriptions for all selected images must be present. The first publication date determines the daily page.
 
 Create JSON (all fields required; draft values can be empty):
 
@@ -67,3 +67,9 @@ curl --fail-with-body "$BLOG_URL/api/v1/posts/$POST_ID/images/before" \
   -H "Content-Type: image/png" \
   --data-binary @before.png
 ```
+
+## Flexible image galleries
+
+For new clients, upload each image to `POST /api/v1/posts/{id}/images/gallery`, then send `images: [{"id":"uploaded UUID","alt":"Proposal A"}, ...]` in the create/PUT body. The array is the full gallery in display order; omit an image to remove it on save. There is no image-count limit, and `images: []` supports text-only updates. Each image retains the 10 MiB/32-megapixel limit, and JSON requests are limited to 256 KiB. Selected images must belong to this entry and have unique IDs.
+
+The old `/images/before` and `/images/after` endpoints and `beforeId`/`afterId` fields remain supported. When `images` is present it takes precedence, and the four legacy image fields may be omitted. PUT without `images` uses the legacy pair, so gallery clients should always send the full array. Publishing uses all saved images. Poll creation and moderation are available in the owner editor; the publishing API does not manage guest identities or votes.

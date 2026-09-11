@@ -1,12 +1,12 @@
 import { sql } from "drizzle-orm";
 import {
   pgTable,
+  uniqueIndex,
   uuid,
   text,
   timestamp,
   integer,
   boolean,
-  uniqueIndex,
   index,
   check,
   date,
@@ -58,14 +58,12 @@ export const images = pgTable(
     height: integer().notNull(),
     bytes: integer().notNull(),
     alt: text().notNull().default(""),
+    position: integer().notNull().default(0),
     active: boolean().notNull().default(false),
   },
   (t) => [
-    uniqueIndex("active_post_role")
-      .on(t.postId, t.role)
-      .where(sql`${t.active}`),
     index("images_post").on(t.postId),
-    check("image_role", sql`${t.role} in ('before', 'after')`),
+    check("image_role", sql`${t.role} in ('before', 'after', 'gallery')`),
   ],
 );
 
@@ -96,3 +94,43 @@ export const apiRequests = pgTable("api_requests", {
     .notNull()
     .defaultNow(),
 });
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid().primaryKey(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id"),
+    name: text().notNull(),
+    body: text().notNull(),
+    hidden: boolean().notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("comments_post").on(t.postId)],
+);
+export const polls = pgTable("polls", {
+  id: uuid().primaryKey().defaultRandom(),
+  postId: uuid("post_id")
+    .notNull()
+    .unique()
+    .references(() => posts.id, { onDelete: "cascade" }),
+  question: text().notNull(),
+  options: jsonb().notNull(),
+  closed: boolean().notNull().default(false),
+  version: integer().notNull().default(0),
+});
+export const votes = pgTable(
+  "poll_votes",
+  {
+    pollId: uuid("poll_id")
+      .notNull()
+      .references(() => polls.id, { onDelete: "cascade" }),
+    voter: text().notNull(),
+    optionId: uuid("option_id").notNull(),
+  },
+  (t) => [uniqueIndex("one_vote_per_browser").on(t.pollId, t.voter)],
+);

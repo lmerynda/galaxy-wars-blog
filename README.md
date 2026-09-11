@@ -1,6 +1,6 @@
 # Galaxy Wars development log
 
-A public blog for small, visual updates to Galaxy Wars, grouped into one page per day. Every entry has two paragraphs, a before/after screenshot pair, and an optional YouTube link. A password-protected owner studio lives at `/admin`.
+A public blog for small, visual updates to Galaxy Wars, grouped into one page per day. Every entry has two paragraphs, an ordered image gallery, and an optional YouTube link. A password-protected owner studio lives at `/admin`.
 
 The application follows the charcoal/lime styling and single Next.js/PostgreSQL/Railway bucket setup of the sibling Trading Journal project. It starts empty; test posts are never inserted into the development or production database.
 
@@ -38,13 +38,13 @@ npm run dev
 
 1. Open `/admin` and sign in. Choose **New update**, then **Start writing**.
 2. Add a title and two short paragraphs: the original problem, then the change and its effect on players.
-3. Select a **Before** and an **After** screenshot, and describe each image. Uploads accept still PNG, JPEG, or WebP files up to 10 MiB and 32 megapixels each.
+3. Add any number of images, describe each one, and arrange them with **Move up**. **Remove** excludes an image on the next save. Uploads accept still PNG, JPEG, or WebP files up to 10 MiB and 32 megapixels each.
 4. Optionally paste an HTTPS YouTube video link. This appears as an external link, without an embedded player.
 5. **Save draft** to keep work private; **Preview update** to inspect the current form; **Publish update** when ready.
 
 Uploaded replacements stay private until a successful save. The editor retains entered text on errors, warns when leaving with unsaved edits, and prevents stale edits from another tab overwriting a newer save. Unsaved uploads expire after a 24-hour cleanup grace period; save a draft to retain them.
 
-Entries published on the same calendar day appear together at `/days/YYYY-MM-DD`. The homepage shows one card per day, with the entry count, up to three entry titles, and the latest entry's after screenshot. Pagination counts 12 whole days, so it never splits a day across pages. On the daily page, entries appear oldest first, each with its own text, screenshot pair, optional video, and linkable section.
+Entries published on the same calendar day appear together at `/days/YYYY-MM-DD`. The homepage shows one card per day, with the entry count, up to three entry titles, and the latest entry's last gallery image. Pagination counts 12 whole days, so it never splits a day across pages. On the daily page, entries appear oldest first, each with its own text, gallery, optional video, and linkable section.
 
 Days use `BLOG_TIME_ZONE` (default `America/Chicago`), including daylight-saving changes. The day is saved at **first publication**, not draft creation. Later editing, unpublishing/republishing, or timezone configuration changes do not move an existing entry to a different day. There is no extra daily-page editing step: publish each entry normally and it joins its day's page automatically.
 
@@ -138,3 +138,11 @@ The esbuild override keeps Drizzle's legacy development loader on a patched comp
 - `tests`: unit, PostgreSQL/S3 integration, and browser acceptance tests.
 
 The original scope and acceptance gates are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+
+## Comments and design polls
+
+Each published entry has guest comments with nested replies. Visitors enter a display name; no account is required. The owner studio can hide and restore comments, preserving their replies. Hidden comment text and names are not sent to readers. Draft discussions are private. Comments are limited to 3,000 characters and ten submissions per 15 minutes per trusted client IP (shared limit when proxy trust is disabled).
+
+The entry editor can create an optional poll with a question and 2–12 labeled choices, such as Proposal A and Proposal B matching gallery captions. Readers see live totals after each vote and can change their choice. An HTTP-only browser cookie identifies a voter; clearing cookies or using another browser permits another vote, so this is informal feedback, not verified one-person voting. No third-party account or tracking service is used. Poll questions and choices are fixed once votes exist; owners can close or reopen voting. Poll settings save separately from entry text, and polls on drafts remain private until publication.
+
+Migration `0003` adds gallery ordering, comments and polls, preserves before/after ordering for existing entries, and removes the two-image database restriction. Run it through the existing Railway pre-deploy migration step before starting this version.

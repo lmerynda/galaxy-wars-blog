@@ -16,9 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       0,
       180,
     );
-  const image = day.posts
-    .at(-1)
-    ?.images.find((image) => image.role === "after");
+  const image = day.posts.at(-1)?.images.at(-1);
   return {
     title,
     description,

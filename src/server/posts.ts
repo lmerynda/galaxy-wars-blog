@@ -27,7 +27,7 @@ type PostRow = {
 type ImageRow = {
   id: string;
   post_id: string;
-  role: "before" | "after";
+  role: "before" | "after" | "gallery";
   width: number;
   height: number;
   alt: string;
@@ -41,7 +41,7 @@ async function withImages(
   if (!rows.length) return [];
   const images = await sql<
     ImageRow[]
-  >`select id, post_id, role, width, height, alt from post_images where active and post_id in ${sql(rows.map((p) => p.id))}`;
+  >`select id, post_id, role, width, height, alt from post_images where active and post_id in ${sql(rows.map((p) => p.id))} order by position, id`;
   return rows.map((r) => ({
     id: r.id,
     slug: r.slug,
@@ -88,7 +88,7 @@ export async function publicDays(page = 1) {
       ...day,
       image: covers
         .find((post) => post.publishedDay === day.day)
-        ?.images.find((image) => image.role === "after"),
+        ?.images.at(-1),
     })),
     hasMore: summaries.length > 12,
   };
@@ -161,16 +161,24 @@ export async function savePost(
       throw new InputError(
         "Use Save changes or Unpublish for a published post.",
       );
-    const ids = [data.beforeId, data.afterId].filter(Boolean);
+    const ids = data.images.map((image) => image.id);
     // Lock pending-object markers before images so maintenance cannot delete a selected upload.
     if (ids.length)
       await tx`select object_key from storage_cleanup where object_key in (select object_key from post_images where id in ${tx(ids)}) order by object_key for update`;
     const selected = ids.length
       ? await tx`select * from post_images where post_id = ${data.id} and id in ${tx(ids)} for update`
       : [];
+    if (selected.length !== ids.length)
+      throw new InputError(
+        "A selected screenshot has expired or does not belong to this post. Upload it again.",
+      );
     for (const role of ["before", "after"] as const) {
       const id = data[`${role}Id`];
-      if (id && !selected.some((i) => i.id === id && i.role === role))
+      if (
+        data.legacyImages &&
+        id &&
+        !selected.some((i) => i.id === id && i.role === role)
+      )
         throw new InputError(
           "A selected screenshot has expired or does not belong to this post. Upload it again.",
         );
@@ -179,8 +187,9 @@ export async function savePost(
       await tx`select * from post_images where post_id = ${data.id} and active for update`;
     await tx`update post_images set active = false where post_id = ${data.id} and active`;
     for (const image of selected) {
-      const alt = image.role === "before" ? data.beforeAlt : data.afterAlt;
-      await tx`update post_images set active = true, alt = ${alt} where id = ${image.id}`;
+      const position = ids.indexOf(image.id);
+      const alt = data.images[position].alt;
+      await tx`update post_images set active = true, alt = ${alt}, position = ${position} where id = ${image.id}`;
       await tx`delete from storage_cleanup where object_key = ${image.object_key}`;
     }
     for (const image of old.filter((i) => !ids.includes(i.id))) {

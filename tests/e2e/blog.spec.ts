@@ -26,7 +26,9 @@ test("owner publishes a screenshot story and anonymous readers can browse it", a
   await expect(page).toHaveURL(/\/admin\/login/);
   await page.getByLabel("Owner password").fill("incorrect-password");
   await page.getByRole("button", { name: "Enter the studio" }).click();
-  await expect(page.locator(".form-error")).toContainText("Unable to sign in");
+  await expect(page.locator(".form-error").first()).toContainText(
+    "Unable to sign in",
+  );
   await page.getByLabel("Owner password").fill("local-e2e-password-only");
   await page.getByRole("button", { name: "Enter the studio" }).click();
   await expect(page).toHaveURL(/\/admin$/);
@@ -56,8 +58,6 @@ test("owner publishes a screenshot story and anonymous readers can browse it", a
     .fill(
       "Each ammunition type now has its own miniature, with room for its name, details, and purchase controls. The layout adapts to the available width so pilots can compare their options more easily.",
     );
-  await page.getByRole("button", { name: "Publish update" }).click();
-  await expect(page.locator(".form-error")).toContainText("both screenshots");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(
     page.getByText("Draft saved. Only you can see it."),
@@ -73,23 +73,23 @@ test("owner publishes a screenshot story and anonymous readers can browse it", a
   const after = process.env.E2E_AFTER_IMAGE
     ? await readFile(process.env.E2E_AFTER_IMAGE)
     : generated;
-  await page.locator("#beforeFile").setInputFiles({
+  await page.locator("#galleryFiles").setInputFiles({
     name: "before.png",
     mimeType: "image/png",
     buffer: before,
   });
-  await expect(page.getByAltText("before upload preview")).toBeVisible();
+  await expect(page.locator(".upload-preview img").nth(0)).toBeVisible();
   await page
-    .locator("#afterFile")
+    .locator("#galleryFiles")
     .setInputFiles({ name: "after.png", mimeType: "image/png", buffer: after });
-  await expect(page.getByAltText("after upload preview")).toBeVisible();
+  await expect(page.locator(".upload-preview img").nth(1)).toBeVisible();
   await page
-    .locator("#beforeAlt")
+    .getByLabel("Image 1 description", { exact: true })
     .fill(
       "Before: text-only ammunition rows with a clipped precision-charge label.",
     );
   await page
-    .locator("#afterAlt")
+    .getByLabel("Image 2 description", { exact: true })
     .fill(
       "After: ammunition miniatures and clearly separated purchase controls.",
     );
@@ -97,16 +97,19 @@ test("owner publishes a screenshot story and anonymous readers can browse it", a
     .getByLabel("YouTube video link")
     .fill("https://youtu.be/dQw4w9WgXcQ");
   const imageUrl = await page
-    .getByAltText("after upload preview")
+    .locator(".upload-preview img")
+    .nth(1)
     .getAttribute("src");
   await page.route("**/api/posts/*/images", (route) => route.abort());
-  await page.locator("#afterFile").setInputFiles({
+  await page.locator("#galleryFiles").setInputFiles({
     name: "failed.png",
     mimeType: "image/png",
     buffer: after,
   });
-  await expect(page.locator(".form-error")).toContainText("Upload interrupted");
-  await expect(page.getByAltText("after upload preview")).toHaveAttribute(
+  await expect(page.locator(".form-error").first()).toContainText(
+    "Upload interrupted",
+  );
+  await expect(page.locator(".upload-preview img").nth(1)).toHaveAttribute(
     "src",
     imageUrl!,
   );
@@ -279,23 +282,23 @@ test("multiple published entries share a daily page and remain independently edi
     await page.getByLabel("Update title").fill(title);
     await page.getByLabel("What needed improvement?").fill(paragraphOne);
     await page.getByLabel("What changed?").fill(paragraphTwo);
-    await page.locator("#beforeFile").setInputFiles({
+    await page.locator("#galleryFiles").setInputFiles({
       name: "before.png",
       mimeType: "image/png",
       buffer: before,
     });
-    await expect(page.getByAltText("before upload preview")).toBeVisible();
-    await page.locator("#afterFile").setInputFiles({
+    await expect(page.locator(".upload-preview img").nth(0)).toBeVisible();
+    await page.locator("#galleryFiles").setInputFiles({
       name: "after.png",
       mimeType: "image/png",
       buffer: after,
     });
-    await expect(page.getByAltText("after upload preview")).toBeVisible();
+    await expect(page.locator(".upload-preview img").nth(1)).toBeVisible();
     await page
-      .locator("#beforeAlt")
+      .getByLabel("Image 1 description", { exact: true })
       .fill("Original ammunition market with text-only rows.");
     await page
-      .locator("#afterAlt")
+      .getByLabel("Image 2 description", { exact: true })
       .fill("Updated market with miniatures and separated purchase controls.");
     if (video)
       await page
@@ -311,7 +314,8 @@ test("multiple published entries share a daily page and remain independently edi
         .getByRole("link", { name: "View public page" })
         .getAttribute("href"))!,
       imageUrl: (await page
-        .getByAltText("after upload preview")
+        .locator(".upload-preview img")
+        .nth(1)
         .getAttribute("src"))!,
     };
   }
@@ -424,4 +428,141 @@ test("multiple published entries share a daily page and remain independently edi
   await reader.reload();
   await expect(reader.locator(".post-card")).toHaveCount(0);
   await anonymous.close();
+});
+
+test("gallery, threaded comments and design votes work for guests and owners", async ({
+  page,
+  browser,
+}) => {
+  await page.goto("/admin/login");
+  await page.getByLabel("Owner password").fill("local-e2e-password-only");
+  await page.getByRole("button", { name: "Enter the studio" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto("/admin/new");
+  await page.getByRole("button", { name: "Start writing" }).click();
+  await page.getByLabel("Update title").fill("Choose the next interceptor");
+  await page
+    .getByLabel("What needed improvement?")
+    .fill(
+      "The interceptor needs a stronger silhouette. These proposals explore different wing shapes and engine arrangements.",
+    );
+  await page
+    .getByLabel("What changed?")
+    .fill(
+      "Compare the three proposals below and tell us which direction you prefer. Your comments will guide the next iteration.",
+    );
+  const png = process.env.E2E_AFTER_IMAGE
+    ? await readFile(process.env.E2E_AFTER_IMAGE)
+    : await sharp({
+        create: {
+          width: 1280,
+          height: 720,
+          channels: 3,
+          background: "#324f3f",
+        },
+      })
+        .png()
+        .toBuffer();
+  await page.locator("#galleryFiles").setInputFiles(
+    [1, 2, 3].map((i) => ({
+      name: `proposal-${i}.png`,
+      mimeType: "image/png",
+      buffer: png,
+    })),
+  );
+  await expect(page.locator(".upload-preview img")).toHaveCount(3);
+  for (let i = 1; i <= 3; i++)
+    await page
+      .getByLabel(`Image ${i} description`, { exact: true })
+      .fill(`Proposal ${String.fromCharCode(64 + i)}`);
+  await page
+    .getByRole("button", { name: "Move up", exact: true })
+    .nth(2)
+    .click();
+  await expect(
+    page.getByLabel("Image 2 description", { exact: true }),
+  ).toHaveValue("Proposal C");
+  await page
+    .getByLabel("Question", { exact: true })
+    .fill("Which interceptor design should we develop?");
+  await page
+    .getByLabel("Choices, one per line")
+    .fill("Proposal A\nProposal B\nProposal C");
+  await page.getByRole("button", { name: "Create poll", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Save poll", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Publish update" }).click();
+  await expect(
+    page.getByText("Published and saved. Your update is live."),
+  ).toBeVisible();
+  const link = await page
+    .getByRole("link", { name: "View public page" })
+    .getAttribute("href");
+  const guest = await browser.newContext();
+  const reader = await guest.newPage();
+  await reader.goto(link!);
+  const entry = reader.locator("article.day-entry").filter({
+    has: reader.getByRole("heading", { name: "Choose the next interceptor" }),
+  });
+  await expect(entry.locator("figure")).toHaveCount(3);
+  await entry.getByRole("button", { name: "Proposal A", exact: true }).click();
+  await expect(
+    entry.getByRole("button", { name: "Proposal A ✓", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await entry.getByRole("button", { name: "Proposal C", exact: true }).click();
+  await expect(entry.getByText(/1 vote ·/)).toBeVisible();
+  await entry.getByLabel("Your name").fill("Nova Pilot");
+  await entry
+    .getByLabel("Your comment")
+    .fill("Proposal C has the clearest silhouette.");
+  await entry
+    .getByRole("button", { name: "Post comment", exact: true })
+    .click();
+  await expect(entry.locator(".comment")).toHaveCount(1);
+  await entry.getByRole("button", { name: "Reply", exact: true }).click();
+  await entry
+    .getByLabel("Your reply")
+    .fill("The wing shape reads well at a distance.");
+  await entry.getByRole("button", { name: "Post reply", exact: true }).click();
+  await expect(entry.locator(".comment")).toHaveCount(2);
+  await reader.reload();
+  await expect(
+    entry.getByRole("button", { name: "Proposal C ✓", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await reader.setViewportSize({ width: 1440, height: 1000 });
+  await entry
+    .getByRole("heading", { name: "Choose the next interceptor" })
+    .click();
+  await entry.screenshot({
+    path: "artifacts/visual/gallery-discussion-desktop.png",
+  });
+  await reader.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await entry.screenshot({
+    path: "artifacts/visual/gallery-discussion-mobile.png",
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Hide", exact: true }).first().click();
+  await expect(
+    page.getByText("Comment removed", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Voting closed").check();
+  await page.getByRole("button", { name: "Save poll", exact: true }).click();
+  await expect(page.getByText("Poll closed", { exact: true })).toBeVisible();
+  await reader.reload();
+  await expect(
+    entry.getByText("Comment removed", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    entry.getByText("The wing shape reads well at a distance."),
+  ).toBeVisible();
+  await expect(
+    entry.getByRole("button", { name: "Proposal A", exact: true }),
+  ).toBeDisabled();
+  await guest.close();
 });

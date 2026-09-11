@@ -1,4 +1,5 @@
 import { formatDate, videoUrl, type Post } from "@/lib/post";
+import { Discussion } from "./Discussion";
 import { entryAnchor } from "@/lib/day";
 
 export function PostView({
@@ -53,13 +54,15 @@ export function PostView({
             "Explain what changed and what players can now see or do."}
         </p>
       </div>
-      <section className="comparison" aria-label="Before and after screenshots">
-        {(["before", "after"] as const).map((role) => {
-          const image = post.images.find((i) => i.role === role);
+      <section className="comparison" aria-label="Image gallery">
+        {post.images.map((image, index) => {
+          const role = image.role;
           return (
-            <figure key={role} className={`screenshot screenshot-${role}`}>
+            <figure key={image.id} className={`screenshot screenshot-${role}`}>
               <figcaption>
-                <span className="eyebrow">{role}</span>
+                <span className="eyebrow">
+                  {role === "gallery" ? `Image ${index + 1}` : role}
+                </span>
                 <span className="muted">
                   {image ? "Open full resolution ↗" : "Screenshot preview"}
                 </span>
@@ -103,6 +106,7 @@ export function PostView({
           </span>
         </a>
       )}
+      {!preview && post.published && <Discussion postId={post.id} />}
       {!entryNumber && (
         <div className="post-end">
           <span className="star-mark">✳</span>

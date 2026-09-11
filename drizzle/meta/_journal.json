@@ -22,6 +22,13 @@
       "when": 1789104095669,
       "tag": "0002_parched_frightful_four",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789118871363,
+      "tag": "0003_smooth_pestilence",
+      "breakpoints": true
     }
   ]
 }

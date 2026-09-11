@@ -1179,3 +1179,58 @@ textarea {
     scroll-behavior: auto !important;
   }
 }
+
+.discussion {
+  padding: clamp(20px, 4vw, 48px);
+  margin-top: 40px;
+}
+.discussion fieldset {
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+  min-width: 0;
+}
+.discussion form {
+  margin: 24px 0;
+}
+.discussion input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+}
+.discussion textarea,
+.discussion input {
+  margin-bottom: 16px;
+}
+.comment {
+  border-left: 2px solid #465137;
+  padding: 16px;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.comment time {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.comment-body {
+  white-space: pre-wrap;
+}
+.poll {
+  margin: 32px 0;
+}
+.poll-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 16px 0;
+}
+.poll-option .button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.poll-option progress {
+  grid-column: 1/-1;
+  width: 100%;
+  accent-color: #c5ec69;
+}
