@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   HeadBucketCommand,
 } from "@aws-sdk/client-s3";
+import { StorageConfigurationError } from "./diagnostics";
 let client: S3Client | undefined;
 function storage() {
   const {
@@ -21,7 +22,17 @@ function storage() {
     !S3_ACCESS_KEY_ID ||
     !S3_SECRET_ACCESS_KEY
   )
-    throw new Error("Screenshot storage is not configured");
+    throw new StorageConfigurationError(
+      Object.entries({
+        S3_ENDPOINT,
+        S3_REGION,
+        S3_BUCKET,
+        S3_ACCESS_KEY_ID,
+        S3_SECRET_ACCESS_KEY,
+      })
+        .filter(([, value]) => !value)
+        .map(([name]) => name),
+    );
   client ??= new S3Client({
     endpoint: S3_ENDPOINT,
     region: S3_REGION,

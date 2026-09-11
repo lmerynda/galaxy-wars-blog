@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, it, expect } from "vitest";
+import { beforeAll, afterAll, it, expect, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { prepareTestDatabase } from "../support/database";
@@ -90,9 +90,21 @@ it("deduplicates concurrent creates and persists receipts across connection rest
 it("rolls back the draft if its retry receipt cannot be saved", async () => {
   const key = randomUUID();
   const body = { ...draft, title: "receipt-rollback" };
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
   await db()`alter table api_requests add constraint test_receipt_failure check (response->'post'->>'title' <> 'receipt-rollback')`;
   try {
-    expect((await call(["posts"], "POST", body, key)).status).toBe(503);
+    const response = await call(["posts"], "POST", body, key);
+    expect(response.status).toBe(503);
+    const failure = await response.json();
+    expect(failure.requestId).toBe(response.headers.get("x-request-id"));
+    const event = JSON.parse(log.mock.calls.at(-1)![0]);
+    expect(event).toMatchObject({
+      event: "api.request.failed",
+      requestId: failure.requestId,
+      status: 503,
+      error: { code: "23514" },
+    });
+    expect(JSON.stringify(event)).not.toContain(token);
     expect(
       await db()`select id from posts where title = 'receipt-rollback'`,
     ).toHaveLength(0);
@@ -100,6 +112,7 @@ it("rolls back the draft if its retry receipt cannot be saved", async () => {
       await db()`select key from api_requests where key = ${key}`,
     ).toHaveLength(0);
   } finally {
+    log.mockRestore();
     await db()`alter table api_requests drop constraint test_receipt_failure`;
   }
   expect((await call(["posts"], "POST", body, key)).status).toBe(200);

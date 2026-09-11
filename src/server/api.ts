@@ -5,6 +5,7 @@ import { apiTokenValid } from "./auth";
 import { db } from "./db";
 import { ownerPost, savePost } from "./posts";
 import { MAX_IMAGE_BYTES, uploadImage } from "./images";
+import { errorDetails } from "./diagnostics";
 import { InputError, postInput, videoUrl, type Post } from "../lib/post";
 
 class ApiError extends Error {
@@ -54,10 +55,12 @@ async function readBody(request: Request, max: number) {
 
 // All writes and their retry receipts commit together. Locks serialize concurrent retries.
 export async function handleApi(request: Request, path: string[]) {
+  const requestId = randomUUID();
+  const started = Date.now();
   const respond = (body: unknown, status = 200) =>
     Response.json(body, {
       status,
-      headers: { "Cache-Control": "no-store" },
+      headers: { "Cache-Control": "no-store", "X-Request-ID": requestId },
     });
   try {
     const authorization = request.headers.get("authorization") ?? "";
@@ -224,11 +227,23 @@ export async function handleApi(request: Request, path: string[]) {
     if (error instanceof z.ZodError)
       return respond({ error: "Invalid fields or field lengths." }, 400);
     console.error(
-      "API operation failed",
-      error instanceof Error ? error.name : "Unknown error",
+      JSON.stringify({
+        event: "api.request.failed",
+        requestId,
+        method: request.method,
+        postId: z.uuid().safeParse(path[1]).success ? path[1] : undefined,
+        action: ["images", "publish"].includes(path[2]) ? path[2] : "posts",
+        role: ["before", "after"].includes(path[3]) ? path[3] : undefined,
+        status: 503,
+        durationMs: Date.now() - started,
+        error: errorDetails(error),
+      }),
     );
     return respond(
-      { error: "Operation failed. Retry with the same Idempotency-Key." },
+      {
+        error: "Operation failed. Retry with the same Idempotency-Key.",
+        requestId,
+      },
       503,
     );
   }

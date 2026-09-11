@@ -156,7 +156,10 @@ it("preserves old content on storage failure and retries cleanup without deletin
     .mockRejectedValueOnce(new Error("Injected upload failure"));
   await expect(
     uploadImage(token, input.id, "after", png, "image/png"),
-  ).rejects.toThrow(/Injected/);
+  ).rejects.toMatchObject({
+    operation: "storage.putObject",
+    cause: { message: "Injected upload failure" },
+  });
   put.mockRestore();
   expect(
     (await ownerPost(input.id, token))?.images.find((i) => i.role === "after")

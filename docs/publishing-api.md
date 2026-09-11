@@ -56,7 +56,7 @@ A replay returns the original response, which can have an older version. GET the
 
 Failed writes do not record a success receipt. After a timeout or 503, retry unchanged with the same key. After a 409 version conflict, GET and review current content before issuing a new request with a new key. This prevents duplicate posts and protects edits made through the browser.
 
-Errors have `{ "error": "message" }`: 400 invalid content/key, 401 invalid/disabled token, 404 missing endpoint/post, 409 conflict, 413 too large, 415 wrong JSON content type, 503 temporary failure. No API token is accepted in a query string, cookie or preview URL.
+Errors have `{ "error": "message" }`: 400 invalid content/key, 401 invalid/disabled token, 404 missing endpoint/post, 409 conflict, 413 too large, 415 wrong JSON content type, 503 temporary failure. Every response includes `X-Request-ID`; unexpected 503 responses also include `requestId` in their JSON. Search Railway's **Deploy Logs** for that ID to find the structured `api.request.failed` event. It includes the operation (such as `storage.putObject`), safe error codes, provider status/request ID, and missing storage variable names. Raw error messages, SQL, headers and draft content are omitted. Railway's HTTP access log alone only shows the request status and duration. No API token is accepted in a query string, cookie or preview URL.
 
 Example upload (POSIX shell; token loaded from your secret store):
 

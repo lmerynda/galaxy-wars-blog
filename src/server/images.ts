@@ -6,6 +6,7 @@ import { db } from "./db";
 import { requireOwner, sessionValid, type OwnerCredential } from "./auth";
 import { deleteObject, getObject, putObject } from "./storage";
 import { InputError, type PostImage, type Role } from "../lib/post";
+import { OperationError } from "./diagnostics";
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export async function inspectImage(bytes: Buffer, mime: string) {
   if (!bytes.length || bytes.length > MAX_IMAGE_BYTES)
@@ -69,8 +70,16 @@ export async function uploadImage(
   // A durable marker exists even if the process stops between upload and the image insert.
   if (!pendingId)
     await db()`insert into storage_cleanup (object_key, not_before) values (${key}, now() + interval '24 hours')`;
-  await putObject(key, bytes, mime);
-  await sql`insert into post_images (id, post_id, role, object_key, mime, width, height, bytes) values (${id}, ${postId}, ${role}, ${key}, ${meta.mime}, ${meta.width}, ${meta.height}, ${meta.bytes})`;
+  try {
+    await putObject(key, bytes, mime);
+  } catch (error) {
+    throw new OperationError("storage.putObject", error);
+  }
+  try {
+    await sql`insert into post_images (id, post_id, role, object_key, mime, width, height, bytes) values (${id}, ${postId}, ${role}, ${key}, ${meta.mime}, ${meta.width}, ${meta.height}, ${meta.bytes})`;
+  } catch (error) {
+    throw new OperationError("database.insertImage", error);
+  }
   return {
     id,
     role: role as Role,
