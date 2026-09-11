@@ -1,0 +1,69 @@
+# AI publishing API
+
+The API prepares drafts for review and publishes only through a separate explicit request. It uses the same validation, private image storage and daily grouping as the owner editor. Published entries can only be edited or unpublished in the owner editor.
+
+## Enable access
+
+Generate a token locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Store it as `BLOG_API_TOKEN` in the Railway **application service**, redeploy, and put the same value in the publishing agent's secret store. Do not put it in prompts, URLs, Git, or client-side code. Empty/unset disables API access. Replace the token and redeploy to revoke existing access. The API token does not grant a browser login.
+
+Migration `0002` creates persistent retry receipts. Railway's pre-deploy command must be `npm run db:migrate` before deploying this version.
+
+All requests use `Authorization: Bearer <token>`. No cookies or Origin header are required. Responses are JSON with `Cache-Control: no-store`. URLs in responses are relative to the blog origin. Draft preview links open the existing editor and require the owner's normal password login; there is no public preview token.
+
+## Workflow
+
+1. `POST /api/v1/posts` creates a draft with the JSON fields below. Use empty image IDs initially.
+2. `POST /api/v1/posts/{id}/images/before` and `/images/after` upload raw PNG, JPEG or WebP bytes, with the matching `Content-Type` (`image/png`, `image/jpeg`, `image/webp`). Each returns `{ "image": { "id": "…", ... } }`. Images remain staged and private until selected in a saved draft. Limits: 10 MiB, 32 megapixels, still images only. Save selections within 24 hours; abandoned uploads are eligible for existing storage cleanup.
+3. `PUT /api/v1/posts/{id}` saves the complete JSON content below, including the latest `version` and uploaded image IDs. This is a full replacement, not a partial patch. It cannot publish or change a published entry.
+4. Share `previewUrl` with the owner for review. The editor includes its usual preview.
+5. After explicit publishing approval, `GET /api/v1/posts/{id}` retrieves the current post and version. Confirm the content is still the approved version; if it changed, seek a fresh review.
+6. `POST /api/v1/posts/{id}/publish` with `{ "version": 2 }` publishes the saved content and returns `publicUrl`. Both paragraphs, images, and alt descriptions must be present. The first publication date determines the daily page.
+
+Create JSON (all fields required; draft values can be empty):
+
+```json
+{
+  "title": "Clearer targeting",
+  "paragraphOne": "Previously, selecting a nearby ship was difficult.",
+  "paragraphTwo": "The updated targeting makes the intended ship easier to select.",
+  "youtubeUrl": "",
+  "beforeId": "",
+  "afterId": "",
+  "beforeAlt": "Targeting before the change",
+  "afterAlt": "Targeting after the change"
+}
+```
+
+For PUT, add `"version": <current post.version>`. Titles allow 120 characters, each paragraph 1,500, alt text 200, and the optional HTTPS YouTube URL 2,048. Unknown fields are rejected. Send `youtubeUrl`, not the returned `videoId`.
+
+Create, save, read and publish return:
+
+```json
+{
+  "post": { "id": "…", "version": 1, "published": false, "images": [] },
+  "previewUrl": "/admin/posts/…/edit",
+  "publicUrl": null
+}
+```
+
+The actual `post` also contains content and publication metadata. All successful requests return HTTP 200.
+
+## Safe retries
+
+Every mutation requires an `Idempotency-Key`: a fresh UUID is recommended (16–128 letters, digits, underscores or hyphens). Keep the same key, method, path, content type and exact body bytes when retrying that request. The successful response is stored durably with the write and replayed on retries, including after restarts. Keys are global to this blog and survive token rotation. Reusing a key for different content returns 409. Receipts are retained indefinitely; they contain content snapshots but no API tokens.
+
+A replay returns the original response, which can have an older version. GET the post for its current state. Never reuse a key for a new edit or upload. A retry of an abandoned, expired upload can return its original image ID; use a fresh key and upload again if it has been cleaned up.
+
+Failed writes do not record a success receipt. After a timeout or 503, retry unchanged with the same key. After a 409 version conflict, GET and review current content before issuing a new request with a new key. This prevents duplicate posts and protects edits made through the browser.
+
+Errors have `{ "error": "message" }`: 400 invalid content/key, 401 invalid/disabled token, 404 missing endpoint/post, 409 conflict, 413 too large, 415 wrong JSON content type, 503 temporary failure. No API token is accepted in a query string, cookie or preview URL.
+
+Example upload (POSIX shell; token loaded from your secret store):
+
+```sh
+curl --fail-with-body "$BLOG_URL/api/v1/posts/$POST_ID/images/before" \
+  -H "Authorization: Bearer $BLOG_API_TOKEN" \
+  -H "Idempotency-Key: $UPLOAD_REQUEST_ID" \
+  -H "Content-Type: image/png" \
+  --data-binary @before.png
+```

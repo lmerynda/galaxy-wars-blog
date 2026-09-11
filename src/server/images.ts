@@ -1,8 +1,9 @@
 import sharp from "sharp";
+import type { TransactionSql } from "postgres";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "./db";
-import { requireOwner, sessionValid } from "./auth";
+import { requireOwner, sessionValid, type OwnerCredential } from "./auth";
 import { deleteObject, getObject, putObject } from "./storage";
 import { InputError, type PostImage, type Role } from "../lib/post";
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -45,11 +46,13 @@ export async function inspectImage(bytes: Buffer, mime: string) {
   }
 }
 export async function uploadImage(
-  token: string | undefined,
+  token: OwnerCredential,
   postId: string,
   role: string,
   bytes: Buffer,
   mime: string,
+  transaction?: TransactionSql,
+  pendingId?: string,
 ): Promise<PostImage> {
   await requireOwner(token);
   if (
@@ -57,15 +60,17 @@ export async function uploadImage(
     !["before", "after"].includes(role)
   )
     throw new InputError("Invalid screenshot destination.");
-  if (!(await db()`select id from posts where id = ${postId}`).length)
+  const sql = transaction ?? db();
+  if (!(await sql`select id from posts where id = ${postId}`).length)
     throw new InputError("This draft no longer exists.");
   const meta = await inspectImage(bytes, mime);
-  const id = randomUUID(),
+  const id = pendingId ?? randomUUID(),
     key = `posts/${postId}/${id}`;
   // A durable marker exists even if the process stops between upload and the image insert.
-  await db()`insert into storage_cleanup (object_key, not_before) values (${key}, now() + interval '24 hours')`;
+  if (!pendingId)
+    await db()`insert into storage_cleanup (object_key, not_before) values (${key}, now() + interval '24 hours')`;
   await putObject(key, bytes, mime);
-  await db()`insert into post_images (id, post_id, role, object_key, mime, width, height, bytes) values (${id}, ${postId}, ${role}, ${key}, ${meta.mime}, ${meta.width}, ${meta.height}, ${meta.bytes})`;
+  await sql`insert into post_images (id, post_id, role, object_key, mime, width, height, bytes) values (${id}, ${postId}, ${role}, ${key}, ${meta.mime}, ${meta.width}, ${meta.height}, ${meta.bytes})`;
   return {
     id,
     role: role as Role,

@@ -15,6 +15,13 @@
       "when": 1789023158614,
       "tag": "0001_tearful_ser_duncan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789104095669,
+      "tag": "0002_parched_frightful_four",
+      "breakpoints": true
     }
   ]
 }

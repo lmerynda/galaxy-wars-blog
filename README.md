@@ -60,7 +60,9 @@ Create one Railway project with three resources:
 - PostgreSQL, dedicated to this blog.
 - A private Railway Storage Bucket, dedicated to this blog.
 
-The checked-in `railway.json` specifies `npm run build`, the pre-deploy migration command `npm run db:migrate`, `npm start`, and the database-aware health check `/api/health`. `next start` reads Railway's `PORT`. The runtime migration/maintenance dependency `tsx` is a production dependency, so commands also work when development packages are pruned.
+Configure the app service in Railway Settings: build `npm run build`, pre-deploy `npm run db:migrate`, start `npm start`, and health check `/api/health`. The checked-in `railway.json` records these values for legacy services, but new Railway services no longer accept that configuration format as of August 28, 2026; do not rely on automatic discovery. The production service was configured directly in the Railway UI. `next start` reads Railway's `PORT`. The runtime migration/maintenance dependency `tsx` is a production dependency, so commands also work when development packages are pruned.
+
+For AI-assisted draft creation, screenshot uploads and explicit publishing, see [Publishing API](docs/publishing-api.md). Set the optional `BLOG_API_TOKEN` secret on the app service to enable it; it is independent of the owner password.
 
 Set these **application service** variables using Railway resource references where possible:
 

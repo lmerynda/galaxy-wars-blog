@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "./db";
-import { requireOwner } from "./auth";
+import type { Sql, TransactionSql } from "postgres";
+import { requireOwner, type OwnerCredential } from "./auth";
 import { isDay, publicationDay } from "../lib/day";
 import {
   InputError,
@@ -33,9 +34,11 @@ type ImageRow = {
 };
 const fields =
   "id, slug, title, paragraph_one, paragraph_two, video_id, published, published_at, published_day::text as published_day, version";
-async function withImages(rows: PostRow[]): Promise<Post[]> {
+async function withImages(
+  rows: PostRow[],
+  sql: Sql | TransactionSql = db(),
+): Promise<Post[]> {
   if (!rows.length) return [];
-  const sql = db();
   const images = await sql<
     ImageRow[]
   >`select id, post_id, role, width, height, alt from post_images where active and post_id in ${sql(rows.map((p) => p.id))}`;
@@ -116,16 +119,20 @@ export async function ownerPosts(token?: string) {
     >`select ${sql.unsafe(fields)} from posts order by updated_at desc`,
   );
 }
-export async function ownerPost(id: string, token?: string) {
+export async function ownerPost(
+  id: string,
+  token?: OwnerCredential,
+  sql: Sql | TransactionSql = db(),
+) {
   await requireOwner(token);
   if (!z.uuid().safeParse(id).success) return null;
-  const sql = db();
   return (
     (
       await withImages(
         await sql<
           PostRow[]
         >`select ${sql.unsafe(fields)} from posts where id = ${id}`,
+        sql,
       )
     )[0] ?? null
   );
@@ -135,10 +142,14 @@ export async function createPost(token?: string) {
   const [row] = await db()`insert into posts default values returning id`;
   return row.id as string;
 }
-export async function savePost(token: string | undefined, input: unknown) {
+export async function savePost(
+  token: OwnerCredential,
+  input: unknown,
+  transaction?: TransactionSql,
+) {
   await requireOwner(token);
   const data = validatePost(input);
-  await db().begin(async (tx) => {
+  const apply = async (tx: TransactionSql) => {
     const [post] =
       await tx`select * from posts where id = ${data.id} for update`;
     if (!post) throw new InputError("This post no longer exists.");
@@ -193,6 +204,8 @@ export async function savePost(token: string | undefined, input: unknown) {
     await tx`update posts set title = ${data.title}, paragraph_one = ${data.paragraphOne}, paragraph_two = ${data.paragraphTwo}, video_id = ${data.videoId},
       slug = ${slug}, published = ${data.intent === "publish"},
       published_at = ${publishedAt}, published_day = ${publishedDay}, updated_at = now(), version = version + 1 where id = ${data.id}`;
-  });
-  return (await ownerPost(data.id, token))!;
+  };
+  if (transaction) await apply(transaction);
+  else await db().begin(apply);
+  return (await ownerPost(data.id, token, transaction ?? db()))!;
 }

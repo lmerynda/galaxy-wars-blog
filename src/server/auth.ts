@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual, createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { db } from "./db";
 import { digest, validHash, verifyPassword } from "./password";
@@ -20,8 +20,18 @@ export async function sessionValid(token: string | undefined) {
     await db()`select 1 from admin_sessions where token_hash = ${digest(token)} and credential_version = ${digest(hash)} and expires_at > now()`;
   return rows.length === 1;
 }
-export async function requireOwner(token: string | undefined) {
-  if (!(await sessionValid(token))) throw new AuthError();
+export type OwnerCredential = string | undefined | { apiToken: string };
+export function apiTokenValid(token: string) {
+  const expected = process.env.BLOG_API_TOKEN;
+  if (!expected || expected.length < 32 || !token || token.length > 512)
+    return false;
+  const hash = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(hash(token), hash(expected));
+}
+export async function requireOwner(token: OwnerCredential) {
+  if (typeof token === "object") {
+    if (!apiTokenValid(token.apiToken)) throw new AuthError();
+  } else if (!(await sessionValid(token))) throw new AuthError();
 }
 export async function login(
   password: string,

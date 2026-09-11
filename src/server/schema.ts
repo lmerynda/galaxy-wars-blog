@@ -10,6 +10,7 @@ import {
   index,
   check,
   date,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const posts = pgTable(
@@ -85,4 +86,13 @@ export const cleanup = pgTable("storage_cleanup", {
   objectKey: text("object_key").primaryKey(),
   notBefore: timestamp("not_before", { withTimezone: true }).notNull(),
   attempts: integer().notNull().default(0),
+});
+
+export const apiRequests = pgTable("api_requests", {
+  key: text().primaryKey(),
+  fingerprint: text().notNull(),
+  response: jsonb().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });

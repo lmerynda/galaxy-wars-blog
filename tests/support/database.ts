@@ -40,7 +40,7 @@ export async function prepareTestDatabase(
     const oldObjects =
       await sql`select object_key from post_images union select object_key from storage_cleanup`;
     for (const object of oldObjects) await deleteObject(object.object_key);
-    await sql`truncate posts, post_images, storage_cleanup, admin_sessions, login_attempts cascade`;
+    await sql`truncate posts, post_images, storage_cleanup, admin_sessions, login_attempts, api_requests cascade`;
   } finally {
     await sql.end();
   }
