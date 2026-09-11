@@ -210,7 +210,7 @@ export async function handleApi(request: Request, path: string[]) {
                 title: post.title,
                 paragraphOne: post.paragraphOne,
                 paragraphTwo: post.paragraphTwo,
-                youtubeUrl: post.videoId ? videoUrl(post.videoId) : "",
+                youtubeUrls: post.videoIds.map(videoUrl),
                 beforeId: before?.id ?? "",
                 afterId: after?.id ?? "",
                 beforeAlt: before?.alt ?? "",

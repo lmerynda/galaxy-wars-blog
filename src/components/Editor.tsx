@@ -20,7 +20,7 @@ function fields(post: Post): PostInput {
     title: post.title,
     paragraphOne: post.paragraphOne,
     paragraphTwo: post.paragraphTwo,
-    youtubeUrl: post.videoId ? videoUrl(post.videoId) : "",
+    youtubeUrls: post.videoIds.length ? post.videoIds.map(videoUrl) : [""],
     beforeId: post.images.find((i) => i.role === "before")?.id ?? "",
     afterId: post.images.find((i) => i.role === "after")?.id ?? "",
     beforeAlt: post.images.find((i) => i.role === "before")?.alt ?? "",
@@ -167,18 +167,21 @@ export function Editor({ initial }: { initial: Post }) {
       setSaving(false);
     }
   }
-  let previewVideo: string | null = null;
-  try {
-    previewVideo = youtubeId(form.youtubeUrl);
-  } catch {
-    /* Invalid links stay out of preview; save reports the error. */
-  }
+  const previewVideos = (form.youtubeUrls ?? []).flatMap((url) => {
+    try {
+      const id = youtubeId(url);
+      return id ? [id] : [];
+    } catch {
+      return [];
+    }
+  });
   const previewPost: Post = {
     ...saved,
     title: form.title,
     paragraphOne: form.paragraphOne.replace(/\s+/g, " ").trim(),
     paragraphTwo: form.paragraphTwo.replace(/\s+/g, " ").trim(),
-    videoId: previewVideo,
+    videoId: previewVideos[0] ?? null,
+    videoIds: previewVideos,
     images: (form.images ?? []).map((selection) => ({
       ...images.find((image) => image.id === selection.id)!,
       alt: selection.alt,
@@ -391,15 +394,59 @@ export function Editor({ initial }: { initial: Post }) {
                 </p>
               </div>
               <div>
-                <label htmlFor="youtubeUrl">YouTube video link</label>
-                <input
-                  type="url"
-                  id="youtubeUrl"
-                  value={form.youtubeUrl}
-                  onChange={(e) => change("youtubeUrl", e.target.value)}
-                  maxLength={2048}
-                  placeholder="https://www.youtube.com/watch?v=…"
-                />
+                {(form.youtubeUrls ?? []).map((url, index) => (
+                  <div className="video-input" key={index}>
+                    <label htmlFor={`youtubeUrl-${index}`}>
+                      {index === 0
+                        ? "YouTube video link"
+                        : `YouTube video link ${index + 1}`}
+                    </label>
+                    <input
+                      type="url"
+                      id={`youtubeUrl-${index}`}
+                      value={url}
+                      maxLength={2048}
+                      placeholder="https://www.youtube.com/watch?v=…"
+                      onChange={(e) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          youtubeUrls: prev.youtubeUrls?.map((value, i) =>
+                            i === index ? e.target.value : value,
+                          ),
+                        }));
+                        setMessage("");
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={() => {
+                        setForm((prev) => ({
+                          ...prev,
+                          youtubeUrls: prev.youtubeUrls?.filter(
+                            (_, i) => i !== index,
+                          ),
+                        }));
+                        setMessage("");
+                      }}
+                    >
+                      Remove video {index + 1}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    setForm((prev) => ({
+                      ...prev,
+                      youtubeUrls: [...(prev.youtubeUrls ?? []), ""],
+                    }));
+                    setMessage("");
+                  }}
+                >
+                  Add video
+                </button>
               </div>
             </section>
           </fieldset>

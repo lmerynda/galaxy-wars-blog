@@ -45,6 +45,22 @@ describe("post boundaries", () => {
     };
     expect(validatePost(draft).paragraphOne).toBe("first second");
     expect(validatePost(draft).videoId).toBeNull();
+    expect(
+      validatePost({
+        ...draft,
+        youtubeUrls: Array(100).fill("https://youtu.be/dQw4w9WgXcQ"),
+      }).videoIds,
+    ).toHaveLength(100);
+    expect(() =>
+      validatePost({ ...draft, youtubeUrls: ["https://evil.test/video"] }),
+    ).toThrow();
+    expect(
+      validatePost({
+        ...draft,
+        youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+        youtubeUrls: [],
+      }).videoIds,
+    ).toEqual([]);
     expect(() => validatePost({ ...draft, intent: "publish" })).toThrow(
       /To publish/,
     );

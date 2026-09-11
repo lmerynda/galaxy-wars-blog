@@ -92,20 +92,26 @@ export function PostView({
           );
         })}
       </section>
-      {post.videoId && (
-        <a
-          className="video-link"
-          href={videoUrl(post.videoId)}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <span className="play-icon">▶</span>
-          <span>
-            <strong>See it in motion</strong>
-            <small>Watch on YouTube ↗</small>
-          </span>
-        </a>
-      )}
+      {post.videoIds.map((id, index) => (
+        <div className="embedded-video" key={`${id}-${index}`}>
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${id}`}
+            title={`${post.title || "Update"} — video ${index + 1}`}
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+          <a
+            className="video-link"
+            href={videoUrl(id)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Watch on YouTube ↗
+          </a>
+        </div>
+      ))}
       {!preview && post.published && <Discussion postId={post.id} />}
       {!entryNumber && (
         <div className="post-end">

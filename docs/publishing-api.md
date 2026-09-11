@@ -26,7 +26,7 @@ Create JSON (all fields required; draft values can be empty):
   "title": "Clearer targeting",
   "paragraphOne": "Previously, selecting a nearby ship was difficult.",
   "paragraphTwo": "The updated targeting makes the intended ship easier to select.",
-  "youtubeUrl": "",
+  "youtubeUrls": ["https://youtu.be/VIDEO_ID_HERE"],
   "beforeId": "",
   "afterId": "",
   "beforeAlt": "Targeting before the change",
@@ -34,7 +34,7 @@ Create JSON (all fields required; draft values can be empty):
 }
 ```
 
-For PUT, add `"version": <current post.version>`. Titles allow 120 characters, each paragraph 1,500, alt text 200, and the optional HTTPS YouTube URL 2,048. Unknown fields are rejected. Send `youtubeUrl`, not the returned `videoId`.
+For PUT, add `"version": <current post.version>`. Titles allow 120 characters, each paragraph 1,500, alt text 200, and each HTTPS YouTube URL 2,048. `youtubeUrls` is an ordered array with no video-count limit; send `[]` to remove all videos. The overall API request-size limit still applies. Unknown fields are rejected. Send `youtubeUrls`, not the returned `videoIds`. Legacy `youtubeUrl` is still accepted when `youtubeUrls` is omitted; the array takes precedence. Responses retain `videoId` as the first video for older clients. Videos render as embedded players.
 
 Create, save, read and publish return:
 

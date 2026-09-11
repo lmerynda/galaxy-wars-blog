@@ -22,6 +22,7 @@ export const posts = pgTable(
     paragraphOne: text("paragraph_one").notNull().default(""),
     paragraphTwo: text("paragraph_two").notNull().default(""),
     videoId: text("video_id"),
+    videoIds: text("video_ids").array().notNull().default([]),
     published: boolean().notNull().default(false),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     publishedDay: date("published_day"),

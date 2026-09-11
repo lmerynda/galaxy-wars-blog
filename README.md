@@ -1,6 +1,6 @@
 # Galaxy Wars development log
 
-A public blog for small, visual updates to Galaxy Wars, grouped into one page per day. Every entry has two paragraphs, an ordered image gallery, and an optional YouTube link. A password-protected owner studio lives at `/admin`.
+A public blog for small, visual updates to Galaxy Wars, grouped into one page per day. Every entry has two paragraphs, an ordered image gallery, and optional embedded YouTube videos. A password-protected owner studio lives at `/admin`.
 
 The application follows the charcoal/lime styling and single Next.js/PostgreSQL/Railway bucket setup of the sibling Trading Journal project. It starts empty; test posts are never inserted into the development or production database.
 
@@ -39,12 +39,12 @@ npm run dev
 1. Open `/admin` and sign in. Choose **New update**, then **Start writing**.
 2. Add a title and two short paragraphs: the original problem, then the change and its effect on players.
 3. Add any number of images, describe each one, and arrange them with **Move up**. **Remove** excludes an image on the next save. Uploads accept still PNG, JPEG, or WebP files up to 10 MiB and 32 megapixels each.
-4. Optionally paste an HTTPS YouTube video link. This appears as an external link, without an embedded player.
+4. Optionally add any number of HTTPS YouTube video links using **Add video**. Each renders as an embedded player, with a fallback link to YouTube. Existing single-video entries are preserved by the database migration.
 5. **Save draft** to keep work private; **Preview update** to inspect the current form; **Publish update** when ready.
 
 Uploaded replacements stay private until a successful save. The editor retains entered text on errors, warns when leaving with unsaved edits, and prevents stale edits from another tab overwriting a newer save. Unsaved uploads expire after a 24-hour cleanup grace period; save a draft to retain them.
 
-Entries published on the same calendar day appear together at `/days/YYYY-MM-DD`. The homepage shows one card per day, with the entry count, up to three entry titles, and the latest entry's last gallery image. Pagination counts 12 whole days, so it never splits a day across pages. On the daily page, entries appear oldest first, each with its own text, gallery, optional video, and linkable section.
+Entries published on the same calendar day appear together at `/days/YYYY-MM-DD`. The homepage shows one card per day, with the entry count, up to three entry titles, and the latest entry's last gallery image. Pagination counts 12 whole days, so it never splits a day across pages. On the daily page, entries appear oldest first, each with its own text, gallery, optional videos, and linkable section.
 
 Days use `BLOG_TIME_ZONE` (default `America/Chicago`), including daylight-saving changes. The day is saved at **first publication**, not draft creation. Later editing, unpublishing/republishing, or timezone configuration changes do not move an existing entry to a different day. There is no extra daily-page editing step: publish each entry normally and it joins its day's page automatically.
 

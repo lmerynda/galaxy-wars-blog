@@ -19,6 +19,7 @@ type PostRow = {
   paragraph_one: string;
   paragraph_two: string;
   video_id: string | null;
+  video_ids: string[];
   published: boolean;
   published_at: Date | null;
   published_day: string | null;
@@ -33,7 +34,7 @@ type ImageRow = {
   alt: string;
 };
 const fields =
-  "id, slug, title, paragraph_one, paragraph_two, video_id, published, published_at, published_day::text as published_day, version";
+  "id, slug, title, paragraph_one, paragraph_two, video_id, video_ids, published, published_at, published_day::text as published_day, version";
 async function withImages(
   rows: PostRow[],
   sql: Sql | TransactionSql = db(),
@@ -49,6 +50,7 @@ async function withImages(
     paragraphOne: r.paragraph_one,
     paragraphTwo: r.paragraph_two,
     videoId: r.video_id,
+    videoIds: r.video_ids,
     published: r.published,
     publishedAt: r.published_at?.toISOString() ?? null,
     publishedDay: r.published_day,
@@ -210,7 +212,7 @@ export async function savePost(
       (publishedAt
         ? publicationDay(publishedAt, process.env.BLOG_TIME_ZONE || undefined)
         : null);
-    await tx`update posts set title = ${data.title}, paragraph_one = ${data.paragraphOne}, paragraph_two = ${data.paragraphTwo}, video_id = ${data.videoId},
+    await tx`update posts set title = ${data.title}, paragraph_one = ${data.paragraphOne}, paragraph_two = ${data.paragraphTwo}, video_id = ${data.videoId}, video_ids = ${tx.array(data.videoIds)},
       slug = ${slug}, published = ${data.intent === "publish"},
       published_at = ${publishedAt}, published_day = ${publishedDay}, updated_at = now(), version = version + 1 where id = ${data.id}`;
   };

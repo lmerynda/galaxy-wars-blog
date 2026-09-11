@@ -16,6 +16,7 @@ export type Post = {
   paragraphOne: string;
   paragraphTwo: string;
   videoId: string | null;
+  videoIds: string[];
   published: boolean;
   publishedAt: string | null;
   publishedDay: string | null;
@@ -64,7 +65,8 @@ export const postInput = z.object({
   title: z.string().trim().max(120),
   paragraphOne: paragraph,
   paragraphTwo: paragraph,
-  youtubeUrl: z.string().max(2048),
+  youtubeUrl: z.string().max(2048).default(""),
+  youtubeUrls: z.array(z.string().max(2048)).optional(),
   beforeId: z.union([z.uuid(), z.literal("")]),
   afterId: z.union([z.uuid(), z.literal("")]),
   beforeAlt: z.string().trim().max(200),
@@ -82,7 +84,10 @@ export function validatePost(input: unknown) {
       "Check the field lengths and screenshot selections, then try again.",
     );
   const data = parsed.data;
-  const videoId = youtubeId(data.youtubeUrl);
+  const videoIds = (data.youtubeUrls ?? [data.youtubeUrl])
+    .map(youtubeId)
+    .filter((id): id is string => id !== null);
+  const videoId = videoIds[0] ?? null;
   const images =
     data.images ??
     [
@@ -103,7 +108,13 @@ export function validatePost(input: unknown) {
       "To publish, add a title, both paragraphs, and descriptions for every image.",
     );
   }
-  return { ...data, videoId, images, legacyImages: data.images === undefined };
+  return {
+    ...data,
+    videoId,
+    videoIds,
+    images,
+    legacyImages: data.images === undefined,
+  };
 }
 export function slugBase(title: string) {
   return (

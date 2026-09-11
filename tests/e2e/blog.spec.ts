@@ -163,7 +163,7 @@ test("owner publishes a screenshot story and anonymous readers can browse it", a
   await expect(reader.locator(".post-copy p")).toHaveCount(2);
   await expect(reader.locator(".comparison img")).toHaveCount(2);
   await expect(
-    reader.getByRole("link", { name: "See it in motion" }),
+    reader.getByRole("link", { name: "Watch on YouTube" }),
   ).toHaveAttribute("href", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   await expect
     .poll(() =>
@@ -304,6 +304,14 @@ test("multiple published entries share a daily page and remain independently edi
       await page
         .getByLabel("YouTube video link")
         .fill("https://youtu.be/dQw4w9WgXcQ");
+    if (video) {
+      await page
+        .getByRole("button", { name: "Add video", exact: true })
+        .click();
+      await page
+        .getByLabel("YouTube video link 2", { exact: true })
+        .fill("https://youtu.be/abcdefghijk");
+    }
     await page.getByRole("button", { name: "Publish update" }).click();
     await expect(
       page.getByText("Published and saved. Your update is live."),
@@ -355,7 +363,12 @@ test("multiple published entries share a daily page and remain independently edi
   ]);
   await expect(reader.locator(".post-copy p")).toHaveCount(4);
   await expect(reader.locator(".comparison img")).toHaveCount(4);
-  await expect(reader.locator(".video-link")).toHaveCount(1);
+  await expect(reader.locator(".video-link")).toHaveCount(2);
+  await expect(reader.locator(".embedded-video iframe")).toHaveCount(2);
+  await expect(reader.locator(".embedded-video iframe").nth(1)).toHaveAttribute(
+    "src",
+    "https://www.youtube-nocookie.com/embed/abcdefghijk",
+  );
   await expect(reader.locator('link[rel="canonical"]')).toHaveAttribute(
     "href",
     `http://localhost:3018${dayPath}`,

@@ -247,3 +247,35 @@ it("accepts an ordered API gallery without legacy pair fields", async () => {
   expect(published.post.images).toHaveLength(3);
   expect(published.post.published).toBe(true);
 });
+
+it("preserves ordered videos through creation, publication and clearing", async () => {
+  const youtubeUrls = [
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://youtu.be/abcdefghijk",
+    "https://youtu.be/12345678901",
+  ];
+  const created = await call(["posts"], "POST", {
+    ...draft,
+    images: [],
+    youtubeUrls,
+  });
+  expect(created.status).toBe(200);
+  const { post } = await created.json();
+  expect(post.videoIds).toEqual(["dQw4w9WgXcQ", "abcdefghijk", "12345678901"]);
+  const published = await call(["posts", post.id, "publish"], "POST", {
+    version: post.version,
+  });
+  expect(published.status).toBe(200);
+  expect((await published.json()).post.videoIds).toEqual(post.videoIds);
+  const legacy = await (
+    await call(["posts"], "POST", { ...draft, youtubeUrl: youtubeUrls[0] })
+  ).json();
+  expect(legacy.post.videoIds).toEqual(["dQw4w9WgXcQ"]);
+  const cleared = await call(["posts", legacy.post.id], "PUT", {
+    ...draft,
+    youtubeUrls: [],
+    version: legacy.post.version,
+  });
+  expect(cleared.status).toBe(200);
+  expect((await cleared.json()).post.videoIds).toEqual([]);
+});
