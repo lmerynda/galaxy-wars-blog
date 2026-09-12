@@ -73,7 +73,7 @@ export async function publicDays(page = 1) {
     { day: string; count: number; titles: string[] }[]
   >`
     select published_day::text as day, count(*)::int as count,
-      (array_agg(title order by published_at, id))[1:3] as titles
+      (array_agg(title order by published_at desc, id desc))[1:3] as titles
     from posts where published group by published_day
     order by published_day desc limit 13 offset ${(page - 1) * 12}`;
   const days = summaries.slice(0, 12);
@@ -101,7 +101,7 @@ export async function publicDay(day: string) {
   const posts = await withImages(
     await sql<PostRow[]>`
     select ${sql.unsafe(fields)} from posts where published and published_day = ${day}
-    order by published_at, id`,
+    order by published_at desc, id desc`,
   );
   return posts.length ? { day, posts } : null;
 }

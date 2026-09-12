@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       0,
       180,
     );
-  const image = day.posts.at(-1)?.images.at(-1);
+  const image = day.posts[0]?.images.at(-1);
   return {
     title,
     description,
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title,
       description,
       url: dayUrl(day.day),
-      publishedTime: day.posts[0].publishedAt!,
+      publishedTime: day.posts.at(-1)!.publishedAt!,
       images: image
         ? [
             {

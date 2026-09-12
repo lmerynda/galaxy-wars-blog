@@ -359,8 +359,8 @@ test("multiple published entries share a daily page and remain independently edi
   await reader.locator(".post-card").click();
   await expect(reader.locator("h1")).toHaveCount(1);
   await expect(reader.locator(".day-entry h2")).toHaveText([
-    "Ammunition miniatures",
     "Room for purchase controls",
+    "Ammunition miniatures",
   ]);
   await expect(reader.locator(".post-copy p")).toHaveCount(4);
   await expect(reader.locator(".comparison img")).toHaveCount(4);

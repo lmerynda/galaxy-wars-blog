@@ -44,7 +44,7 @@ npm run dev
 
 Uploaded replacements stay private until a successful save. The editor retains entered text on errors, warns when leaving with unsaved edits, and prevents stale edits from another tab overwriting a newer save. Unsaved uploads expire after a 24-hour cleanup grace period; save a draft to retain them.
 
-Entries published on the same calendar day appear together at `/days/YYYY-MM-DD`. The homepage shows one card per day, with the entry count, up to three entry titles, and the latest entry's last gallery image. Pagination counts 12 whole days, so it never splits a day across pages. On the daily page, entries appear oldest first, each with its own text, gallery, optional videos, and linkable section.
+Entries published on the same calendar day appear together at `/days/YYYY-MM-DD`. The homepage shows one card per day, with the entry count, up to three entry titles, and the latest entry's last gallery image. Pagination counts 12 whole days, so it never splits a day across pages. On the daily page, entries appear newest first, each with its own text, gallery, optional videos, and linkable section.
 
 Days use `BLOG_TIME_ZONE` (default `America/Chicago`), including daylight-saving changes. The day is saved at **first publication**, not draft creation. Later editing, unpublishing/republishing, or timezone configuration changes do not move an existing entry to a different day. There is no extra daily-page editing step: publish each entry normally and it joins its day's page automatically.
 

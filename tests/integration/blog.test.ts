@@ -235,7 +235,7 @@ it("rejects expired, tampered, logged-out and rotated-password sessions", async 
   process.env.ADMIN_PASSWORD_HASH = prior;
 });
 
-it("groups by first publication day, keeps chronological entry order and hides only the unpublished entry", async () => {
+it("groups by first publication day, keeps newest entries first and hides only the unpublished entry", async () => {
   const first = await completeInput("Daily first"),
     second = await completeInput("Daily second"),
     next = await completeInput("Next day");
@@ -252,14 +252,14 @@ it("groups by first publication day, keeps chronological entry order and hides o
     expect(b.publishedDay).toBe(a.publishedDay);
     expect(c.publishedDay).toBe("2025-09-11");
     expect((await publicDay(a.publishedDay!))?.posts.map((p) => p.id)).toEqual([
-      a.id,
       b.id,
+      a.id,
     ]);
     expect(
       (await publicDays()).days.find((day) => day.day === a.publishedDay),
     ).toMatchObject({
       count: 2,
-      titles: [a.title, b.title],
+      titles: [b.title, a.title],
       image: { id: b.images.find((image) => image.role === "after")!.id },
     });
     a = await savePost(token, {
@@ -275,8 +275,8 @@ it("groups by first publication day, keeps chronological entry order and hides o
     a = await savePost(token, { ...first.input, version: a.version });
     expect(a.publishedDay).toBe("2025-09-10");
     expect((await publicDay(a.publishedDay!))?.posts.map((p) => p.id)).toEqual([
-      a.id,
       b.id,
+      a.id,
     ]);
     await savePost(token, {
       ...next.input,
