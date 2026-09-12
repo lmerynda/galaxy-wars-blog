@@ -280,6 +280,7 @@ test("multiple published entries share a daily page and remain independently edi
     await page.goto("/admin/new");
     await page.getByRole("button", { name: "Start writing" }).click();
     await page.getByLabel("Update title").fill(title);
+    await page.getByLabel("Entry date", { exact: true }).fill("2024-02-29");
     await page.getByLabel("What needed improvement?").fill(paragraphOne);
     await page.getByLabel("What changed?").fill(paragraphTwo);
     await page.locator("#galleryFiles").setInputFiles({
@@ -429,6 +430,21 @@ test("multiple published entries share a daily page and remain independently edi
   await reader.goto("/");
   await expect(reader.locator(".image-badge")).toHaveText("1 update");
   await page.goto(first.editUrl);
+  await expect(page.getByLabel("Entry date", { exact: true })).toHaveValue(
+    "2024-02-29",
+  );
+  await page.getByLabel("Entry date", { exact: true }).fill("2023-12-31");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(
+    page.getByText("Published and saved. Your update is live."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "View public page" }),
+  ).toHaveAttribute("href", /2023-12-31/);
+  await reader.goto("/days/2023-12-31");
+  await expect(reader.locator(".day-entry h2")).toHaveText([
+    "Ammunition miniatures",
+  ]);
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Unpublish", exact: true }).click();
   await expect(

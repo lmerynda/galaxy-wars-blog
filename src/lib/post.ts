@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isDay } from "./day";
 
 export type Role = "before" | "after" | "gallery";
 export type PostImage = {
@@ -62,6 +63,13 @@ const paragraph = z
 export const postInput = z.object({
   id: z.uuid(),
   version: z.number().int().nonnegative(),
+  publishedDay: z
+    .string()
+    .refine(
+      (value) => value === "" || (isDay(value) && value >= "0001-01-01"),
+      "Enter a valid entry date.",
+    )
+    .optional(),
   title: z.string().trim().max(120),
   paragraphOne: paragraph,
   paragraphTwo: paragraph,

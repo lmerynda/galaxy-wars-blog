@@ -258,6 +258,7 @@ it("preserves ordered videos through creation, publication and clearing", async 
     ...draft,
     images: [],
     youtubeUrls,
+    publishedDay: "2024-01-15",
   });
   expect(created.status).toBe(200);
   const { post } = await created.json();
@@ -266,7 +267,9 @@ it("preserves ordered videos through creation, publication and clearing", async 
     version: post.version,
   });
   expect(published.status).toBe(200);
-  expect((await published.json()).post.videoIds).toEqual(post.videoIds);
+  const publishedPost = (await published.json()).post;
+  expect(publishedPost.videoIds).toEqual(post.videoIds);
+  expect(publishedPost.publishedDay).toBe("2024-01-15");
   const legacy = await (
     await call(["posts"], "POST", { ...draft, youtubeUrl: youtubeUrls[0] })
   ).json();

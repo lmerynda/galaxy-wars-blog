@@ -17,6 +17,7 @@ function fields(post: Post): PostInput {
   return {
     id: post.id,
     version: post.version,
+    publishedDay: post.publishedDay ?? "",
     title: post.title,
     paragraphOne: post.paragraphOne,
     paragraphTwo: post.paragraphTwo,
@@ -180,6 +181,7 @@ export function Editor({ initial }: { initial: Post }) {
     title: form.title,
     paragraphOne: form.paragraphOne.replace(/\s+/g, " ").trim(),
     paragraphTwo: form.paragraphTwo.replace(/\s+/g, " ").trim(),
+    publishedDay: form.publishedDay || saved.publishedDay,
     videoId: previewVideos[0] ?? null,
     videoIds: previewVideos,
     images: (form.images ?? []).map((selection) => ({
@@ -233,6 +235,19 @@ export function Editor({ initial }: { initial: Post }) {
                   <h2>Two paragraphs. One change.</h2>
                 </div>
               </div>
+              <label htmlFor="publishedDay">Entry date</label>
+              <input
+                id="publishedDay"
+                type="date"
+                min="0001-01-01"
+                max="9999-12-31"
+                value={form.publishedDay ?? ""}
+                onChange={(e) => change("publishedDay", e.target.value)}
+              />
+              <p className="muted">
+                Sets the day this entry appears under. Leave blank to keep its
+                date, or use the publication day for a new entry.
+              </p>
               <label htmlFor="title">
                 Update title
                 <span className="field-hint">Give the change a clear name</span>

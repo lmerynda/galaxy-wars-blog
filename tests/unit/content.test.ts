@@ -46,6 +46,16 @@ describe("post boundaries", () => {
     expect(validatePost(draft).paragraphOne).toBe("first second");
     expect(validatePost(draft).videoId).toBeNull();
     expect(
+      validatePost({ ...draft, publishedDay: "2024-02-29" }).publishedDay,
+    ).toBe("2024-02-29");
+    for (const publishedDay of [
+      "2025-02-29",
+      "2026-13-01",
+      "0000-01-01",
+      "09/01/2026",
+    ])
+      expect(() => validatePost({ ...draft, publishedDay })).toThrow();
+    expect(
       validatePost({
         ...draft,
         youtubeUrls: Array(100).fill("https://youtu.be/dQw4w9WgXcQ"),

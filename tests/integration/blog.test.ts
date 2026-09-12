@@ -343,3 +343,36 @@ it("backfills pre-existing published and unpublished entries without shifting th
     expect(publicationDay(new Date("2026-09-11T04:59:59Z"))).toBe(rows[0].day);
   });
 });
+
+it("backfills drafts and moves live entries between daily pages", async () => {
+  const { input } = await completeInput("Backfilled update");
+  const draft = await savePost(token, {
+    ...input,
+    intent: "draft",
+    publishedDay: "2024-02-29",
+  });
+  expect(draft.publishedDay).toBe("2024-02-29");
+  expect(draft.publishedAt).toBeNull();
+  const published = await savePost(token, { ...input, version: draft.version });
+  expect(published.publishedDay).toBe("2024-02-29");
+  expect(
+    (await publicDay("2024-02-29"))?.posts.some((p) => p.id === input.id),
+  ).toBe(true);
+  const moved = await savePost(token, {
+    ...input,
+    version: published.version,
+    publishedDay: "2023-12-31",
+  });
+  expect(moved.publishedAt).toBe(published.publishedAt);
+  expect(moved.slug).toBe(published.slug);
+  expect(await publicDay("2024-02-29")).toBeNull();
+  expect(
+    (await publicDay("2023-12-31"))?.posts.some((p) => p.id === input.id),
+  ).toBe(true);
+  const preserved = await savePost(token, {
+    ...input,
+    version: moved.version,
+    publishedDay: "",
+  });
+  expect(preserved.publishedDay).toBe("2023-12-31");
+});

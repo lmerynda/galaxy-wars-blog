@@ -208,7 +208,8 @@ export async function savePost(
     const publishedAt =
       post.published_at ?? (data.intent === "publish" ? new Date() : null);
     const publishedDay =
-      post.published_day ??
+      data.publishedDay ||
+      post.published_day ||
       (publishedAt
         ? publicationDay(publishedAt, process.env.BLOG_TIME_ZONE || undefined)
         : null);
