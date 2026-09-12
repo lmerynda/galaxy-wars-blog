@@ -10,6 +10,14 @@ Migration `0002` creates persistent retry receipts. Railway's pre-deploy command
 
 All requests use `Authorization: Bearer <token>`. No cookies or Origin header are required. Responses are JSON with `Cache-Control: no-store`. URLs in responses are relative to the blog origin. Draft preview links open the existing editor and require the owner's normal password login; there is no public preview token.
 
+## Discover capabilities
+
+`GET /api/v1/help` returns JSON with endpoint descriptions, current request JSON Schemas, date handling, image/video capabilities, limits, retry rules, response fields, and copyable request examples. It requires the same bearer token as publishing; no idempotency key is needed. It does not access the database. Clients should fetch it before preparing content so they discover newly supported fields.
+
+```sh
+curl --fail-with-body "$BLOG_URL/api/v1/help" -H "Authorization: Bearer $BLOG_API_TOKEN"
+```
+
 ## Workflow
 
 1. `POST /api/v1/posts` creates a draft with the JSON fields below. Use empty image IDs initially.
@@ -17,9 +25,9 @@ All requests use `Authorization: Bearer <token>`. No cookies or Origin header ar
 3. `PUT /api/v1/posts/{id}` saves the complete JSON content below, including the latest `version` and uploaded image IDs. This is a full replacement, not a partial patch. It cannot publish or change a published entry.
 4. Share `previewUrl` with the owner for review. The editor includes its usual preview.
 5. After explicit publishing approval, `GET /api/v1/posts/{id}` retrieves the current post and version. Confirm the content is still the approved version; if it changed, seek a fresh review.
-6. `POST /api/v1/posts/{id}/publish` with `{ "version": 2 }` publishes the saved content and returns `publicUrl`. Both paragraphs and descriptions for all selected images must be present. The first publication date determines the daily page.
+6. `POST /api/v1/posts/{id}/publish` with `{ "version": 2 }` publishes the saved content and returns `publicUrl`. Both paragraphs and descriptions for all selected images must be present. The saved publishedDay determines the daily page, defaulting to the first publication day.
 
-Create JSON (all fields required; draft values can be empty):
+Create JSON (title and both paragraphs are required; draft values can be empty):
 
 ```json
 {

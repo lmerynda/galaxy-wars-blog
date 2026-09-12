@@ -282,3 +282,46 @@ it("preserves ordered videos through creation, publication and clearing", async 
   expect(cleared.status).toBe(200);
   expect((await cleared.json()).post.videoIds).toEqual([]);
 });
+
+it("serves authenticated capability help with usable schemas and examples", async () => {
+  expect(
+    (await call(["help"], "GET", undefined, randomUUID(), "wrong")).status,
+  ).toBe(401);
+  const response = await handleApi(
+    new Request("http://localhost/api/v1/help", {
+      headers: { authorization: `Bearer ${token}` },
+    }),
+    ["help"],
+  );
+  expect(response.status).toBe(200);
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(response.headers.get("x-request-id")).toBeTruthy();
+  const help = await response.json();
+  expect(help.requestSchemas.create.properties.publishedDay.type).toBe(
+    "string",
+  );
+  expect(help.requestSchemas.create.properties.youtubeUrls.type).toBe("array");
+  expect(help.requestSchemas.update.required).toContain("version");
+  expect(JSON.stringify(help)).not.toContain(token);
+  const created = await call(
+    ["posts"],
+    "POST",
+    help.examples.createBackdatedEntry,
+  );
+  expect(created.status).toBe(200);
+  const { post } = await created.json();
+  const updated = await call(["posts", post.id], "PUT", {
+    ...help.examples.updateDraft,
+    version: post.version,
+  });
+  expect(updated.status).toBe(200);
+  expect((await updated.json()).post.publishedDay).toBe("2024-03-01");
+  expect((await call(["help"], "POST")).status).toBe(404);
+  expect((await call(["help", "extra"], "GET")).status).toBe(404);
+  delete process.env.BLOG_API_TOKEN;
+  try {
+    expect((await call(["help"], "GET")).status).toBe(401);
+  } finally {
+    process.env.BLOG_API_TOKEN = token;
+  }
+});

@@ -1,3 +1,4 @@
+import { content, revision, apiHelp } from "./api-help";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { JSONValue } from "postgres";
@@ -6,7 +7,7 @@ import { db } from "./db";
 import { ownerPost, savePost } from "./posts";
 import { MAX_IMAGE_BYTES, uploadImage } from "./images";
 import { errorDetails } from "./diagnostics";
-import { InputError, postInput, videoUrl, type Post } from "../lib/post";
+import { InputError, videoUrl, type Post } from "../lib/post";
 
 class ApiError extends Error {
   constructor(
@@ -16,16 +17,6 @@ class ApiError extends Error {
     super(message);
   }
 }
-const content = postInput
-  .omit({ id: true, version: true, intent: true })
-  .extend({
-    beforeId: postInput.shape.beforeId.default(""),
-    afterId: postInput.shape.afterId.default(""),
-    beforeAlt: postInput.shape.beforeAlt.default(""),
-    afterAlt: postInput.shape.afterAlt.default(""),
-  })
-  .strict();
-const revision = z.object({ version: z.number().int().nonnegative() }).strict();
 function result(post: Post) {
   return {
     post,
@@ -73,6 +64,8 @@ export async function handleApi(request: Request, path: string[]) {
     const match = /^Bearer ([^\s]+)$/i.exec(authorization);
     if (!match || !apiTokenValid(match[1]))
       throw new ApiError(401, "A valid API bearer token is required.");
+    if (request.method === "GET" && path.length === 1 && path[0] === "help")
+      return respond(apiHelp());
     const credential = { apiToken: match[1] };
     const [resource, id, action, role] = path;
     if (
