@@ -57,7 +57,10 @@ export function Discussion({
         setError(result.error);
         return false;
       }
-      if (result.data) setData(result.data);
+      if (result.data) {
+        setData(result.data);
+        window.dispatchEvent(new Event("comments-changed"));
+      }
       return true;
     } catch {
       setError("Connection interrupted. Please try again.");

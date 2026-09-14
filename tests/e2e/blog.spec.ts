@@ -246,6 +246,9 @@ test("gallery, threaded comments and design votes work for guests and owners", a
     .fill("The wing shape reads well at a distance.");
   await entry.getByRole("button", { name: "Post reply", exact: true }).click();
   await expect(entry.locator(".comment")).toHaveCount(2);
+  await expect(
+    reader.getByRole("link", { name: "2 total comments", exact: true }),
+  ).toBeVisible();
   await reader.reload();
   await expect(
     entry.getByRole("button", { name: "Proposal C ✓", exact: true }),
@@ -284,5 +287,37 @@ test("gallery, threaded comments and design votes work for guests and owners", a
   await expect(
     entry.getByRole("button", { name: "Proposal A", exact: true }),
   ).toBeDisabled();
+  await reader.goto("/");
+  await expect(
+    reader.getByRole("link", { name: "1 total comment", exact: true }),
+  ).toBeVisible();
+  await reader
+    .getByRole("link", { name: "1 total comment", exact: true })
+    .click();
+  await expect(
+    reader.getByRole("heading", { name: "Latest comments." }),
+  ).toBeVisible();
+  await expect(reader.locator(".recent-comment")).toHaveCount(1);
+  await expect(reader.locator(".recent-comment")).toContainText(
+    "The wing shape reads well at a distance.",
+  );
+  await expect(reader.locator(".recent-comment")).not.toContainText(
+    "Proposal C has the clearest silhouette.",
+  );
+  await reader.setViewportSize({ width: 390, height: 844 });
+  await reader.screenshot({
+    path: "artifacts/visual/comments-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await reader.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await reader.setViewportSize({ width: 1440, height: 1000 });
+  await reader.screenshot({
+    path: "artifacts/visual/comments-desktop.png",
+    fullPage: true,
+  });
   await guest.close();
 });

@@ -1,3 +1,4 @@
+import { commentCount, recentComments } from "../../src/server/comment-feed";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
@@ -177,4 +178,33 @@ it("counts one changeable vote per browser and freezes choices after voting", as
   );
   await closeDb();
   expect((await discussion(post.id, "browser-a")).poll?.total).toBe(2);
+});
+
+it("counts comments and replies globally while excluding hidden content from the feed", async () => {
+  const before = await commentCount();
+  const post = await entry();
+  const ids: string[] = [];
+  for (let i = 0; i < 32; i++) {
+    const id = randomUUID();
+    ids.push(id);
+    await db()`insert into comments(id,post_id,parent_id,name,body,created_at) values (${id},${post.id},${i === 1 ? ids[0] : null},'Feed reader',${"Feedback " + i},${new Date(Date.UTC(2099, 0, 1, 0, 0, i))})`;
+  }
+  expect(await commentCount()).toBe(before + 32);
+  const first = await recentComments();
+  expect(first.comments).toHaveLength(30);
+  expect(first.hasMore).toBe(true);
+  expect(first.comments[0].id).toBe(ids[31]);
+  const second = await recentComments(2);
+  expect(second.comments[0]).toMatchObject({
+    id: ids[1],
+    reply: true,
+    postId: post.id,
+  });
+  await moderateComment(owner, post.id, ids[31], true);
+  expect(await commentCount()).toBe(before + 31);
+  expect((await recentComments()).comments.some((c) => c.id === ids[31])).toBe(
+    false,
+  );
+  await moderateComment(owner, post.id, ids[31], false);
+  expect(await commentCount()).toBe(before + 32);
 });

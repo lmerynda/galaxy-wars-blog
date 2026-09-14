@@ -148,3 +148,5 @@ The entry editor can create an optional poll with a question and 2–12 labeled 
 Migration `0003` adds gallery ordering, comments and polls, preserves before/after ordering for existing entries, and removes the two-image database restriction. Run it through the existing Railway pre-deploy migration step before starting this version.
 
 The owner editor’s **Entry date** field supports backfilling and changing dates of published entries. Changing it moves the entry to the selected daily page. Existing daily-page links remain tied to their original day; `/updates/[slug]` resolves to the entry’s current day. Blank dates preserve an existing date or default to the publication day for new entries. The original publication timestamp is retained.
+
+The shared site header displays the total number of visible comments and replies across all entries. It links to `/comments`, a paginated recent-comments feed. Hidden comments are excluded from both. The counter updates after comment/moderation actions, on navigation or returning to the tab, and once per minute while visible. It displays a dash when the count cannot be loaded.

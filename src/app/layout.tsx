@@ -1,3 +1,4 @@
+import { CommentCounter } from "@/components/CommentCounter";
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
@@ -27,9 +28,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 GALAXY WARS<span className="brand-sub">DEVELOPMENT LOG</span>
               </span>
             </Link>
-            <span className="header-note">
-              <span className="status-dot" /> A galaxy in the making
-            </span>
+            <div className="header-tools">
+              <CommentCounter />
+              <span className="header-note">
+                <span className="status-dot" /> A galaxy in the making
+              </span>
+            </div>
           </header>
           <main id="main">{children}</main>
           <footer className="site-footer">

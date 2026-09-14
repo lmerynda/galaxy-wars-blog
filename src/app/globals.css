@@ -1226,3 +1226,67 @@ textarea {
 .video-input button {
   margin-top: 0.5rem;
 }
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.comment-counter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.comment-counter strong {
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 999px;
+  padding: 1px 9px;
+  min-width: 28px;
+  text-align: center;
+}
+.comment-counter:hover {
+  background: #d0ff7112;
+}
+.recent-comments {
+  display: grid;
+  gap: 16px;
+}
+.recent-comment {
+  padding: 24px;
+}
+.recent-comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+.recent-comment .comment-body {
+  margin-bottom: 16px;
+}
+@media (max-width: 700px) {
+  .header-tools .header-note {
+    display: none;
+  }
+  .comment-counter {
+    font-size: 0.75rem;
+    padding: 6px 9px;
+    gap: 6px;
+  }
+  .site-header {
+    gap: 10px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 90px;
+    padding: 16px 0;
+  }
+  .recent-comment {
+    padding: 18px;
+  }
+}
