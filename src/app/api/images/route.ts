@@ -3,10 +3,7 @@ import { MAX_IMAGE_BYTES, uploadImage } from "@/server/images";
 import { mutationToken, safeError } from "@/server/http";
 import { AuthError, InputError } from "@/lib/post";
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request) {
   try {
     const token = await mutationToken();
     await requireOwner(token);
@@ -45,8 +42,6 @@ export async function POST(
     if (!(file instanceof File)) throw new InputError("Choose a screenshot.");
     const image = await uploadImage(
       token,
-      (await params).id,
-      String(form.get("role")),
       Buffer.from(await file.arrayBuffer()),
       file.type,
     );

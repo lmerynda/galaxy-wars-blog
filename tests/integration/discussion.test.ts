@@ -26,7 +26,6 @@ const content = {
   beforeAlt: "",
   afterAlt: "",
   images: [],
-  intent: "publish",
 };
 beforeAll(async () => {
   await prepareTestDatabase("galaxy_wars_blog_test");
@@ -41,17 +40,12 @@ afterAll(async () => {
   for (const row of keys) await deleteObject(row.object_key);
   await closeDb();
 });
-async function entry(published = true) {
-  const id = await createPost(owner);
-  return savePost(owner, {
-    ...content,
-    id,
-    version: 0,
-    intent: published ? "publish" : "draft",
-  });
+async function entry() {
+  return createPost(owner, content);
 }
+
 it("saves galleries of more than two images, preserves order, and keeps removed images private", async () => {
-  const post = await entry(false);
+  const post = await entry();
   const png = await sharp({
     create: { width: 64, height: 64, channels: 3, background: "#456789" },
   })
@@ -59,7 +53,7 @@ it("saves galleries of more than two images, preserves order, and keeps removed 
     .toBuffer();
   const images = [];
   for (let i = 0; i < 4; i++)
-    images.push(await uploadImage(owner, post.id, "gallery", png, "image/png"));
+    images.push(await uploadImage(owner, png, "image/png"));
   const selections = images
     .slice()
     .reverse()
@@ -71,7 +65,7 @@ it("saves galleries of more than two images, preserves order, and keeps removed 
     images: selections,
   });
   expect(saved.images.map((i) => i.id)).toEqual(selections.map((i) => i.id));
-  const foreign = await entry(false);
+  const foreign = await entry();
   await expect(
     savePost(owner, {
       ...content,
@@ -98,10 +92,10 @@ it("saves galleries of more than two images, preserves order, and keeps removed 
   expect(await readImage(selections[0].id)).toBeNull();
   expect((await ownerPost(post.id, owner))?.images[0].alt).toBe("Proposal 2");
 });
-it("supports nested same-entry replies, retry deduplication, moderation and private drafts", async () => {
+it("supports nested same-entry replies, retry deduplication, moderation and missing-entry protection", async () => {
   const post = await entry(),
     other = await entry(),
-    draft = await entry(false);
+    missing = { id: randomUUID() };
   const parent = {
     id: randomUUID(),
     parentId: null,
@@ -123,9 +117,9 @@ it("supports nested same-entry replies, retry deduplication, moderation and priv
     addComment(other.id, { ...reply, id: randomUUID() }, "other"),
   ).rejects.toThrow(/Reply not found/);
   await expect(
-    addComment(draft.id, { ...parent, id: randomUUID() }, "other"),
+    addComment(missing.id, { ...parent, id: randomUUID() }, "other"),
   ).rejects.toThrow(/not found/);
-  await expect(discussion(draft.id, "")).rejects.toThrow(/not found/);
+  await expect(discussion(missing.id, "")).rejects.toThrow(/not found/);
   await expect(
     moderateComment(undefined, post.id, parent.id, true),
   ).rejects.toThrow(/sign in/);

@@ -14,15 +14,14 @@ import {
 
 type PostRow = {
   id: string;
-  slug: string | null;
+  slug: string;
   title: string;
   paragraph_one: string;
   paragraph_two: string;
   video_id: string | null;
   video_ids: string[];
-  published: boolean;
-  published_at: Date | null;
-  published_day: string | null;
+  published_at: Date;
+  published_day: string;
   version: number;
 };
 type ImageRow = {
@@ -34,7 +33,7 @@ type ImageRow = {
   alt: string;
 };
 const fields =
-  "id, slug, title, paragraph_one, paragraph_two, video_id, video_ids, published, published_at, published_day::text as published_day, version";
+  "id, slug, title, paragraph_one, paragraph_two, video_id, video_ids, published_at, published_day::text as published_day, version";
 async function withImages(
   rows: PostRow[],
   sql: Sql | TransactionSql = db(),
@@ -51,8 +50,7 @@ async function withImages(
     paragraphTwo: r.paragraph_two,
     videoId: r.video_id,
     videoIds: r.video_ids,
-    published: r.published,
-    publishedAt: r.published_at?.toISOString() ?? null,
+    publishedAt: r.published_at.toISOString(),
     publishedDay: r.published_day,
     version: r.version,
     images: images
@@ -74,14 +72,14 @@ export async function publicDays(page = 1) {
   >`
     select published_day::text as day, count(*)::int as count,
       (array_agg(title order by published_at desc, id desc))[1:3] as titles
-    from posts where published group by published_day
+    from posts group by published_day
     order by published_day desc limit 13 offset ${(page - 1) * 12}`;
   const days = summaries.slice(0, 12);
   const covers = days.length
     ? await withImages(
         await sql<PostRow[]>`
     select distinct on (posts.published_day) ${sql.unsafe(fields)} from posts
-    where published and published_day in ${sql(days.map((day) => day.day))}
+    where published_day in ${sql(days.map((day) => day.day))}
     order by posts.published_day desc, published_at desc, id desc`,
       )
     : [];
@@ -100,7 +98,7 @@ export async function publicDay(day: string) {
   const sql = db();
   const posts = await withImages(
     await sql<PostRow[]>`
-    select ${sql.unsafe(fields)} from posts where published and published_day = ${day}
+    select ${sql.unsafe(fields)} from posts where published_day = ${day}
     order by published_at desc, id desc`,
   );
   return posts.length ? { day, posts } : null;
@@ -109,7 +107,7 @@ export async function publicPost(slug: string) {
   const sql = db();
   const rows = await sql<
     PostRow[]
-  >`select ${sql.unsafe(fields)} from posts where published and slug = ${slug}`;
+  >`select ${sql.unsafe(fields)} from posts where slug = ${slug}`;
   return (await withImages(rows))[0] ?? null;
 }
 export async function ownerPosts(token?: string) {
@@ -139,36 +137,50 @@ export async function ownerPost(
     )[0] ?? null
   );
 }
-export async function createPost(token?: string) {
-  await requireOwner(token);
-  const [row] = await db()`insert into posts default values returning id`;
-  return row.id as string;
+export async function createPost(
+  token: OwnerCredential,
+  input: Record<string, unknown>,
+  transaction?: TransactionSql,
+) {
+  return savePost(
+    token,
+    { ...input, id: randomUUID(), version: 0 },
+    transaction,
+    true,
+  );
 }
 export async function savePost(
   token: OwnerCredential,
   input: unknown,
   transaction?: TransactionSql,
+  creating = false,
 ) {
   await requireOwner(token);
   const data = validatePost(input);
   const apply = async (tx: TransactionSql) => {
-    const [post] =
-      await tx`select * from posts where id = ${data.id} for update`;
+    // Serialize a new browser entry ID as well as edits so retries cannot create duplicates.
+    await tx`select pg_advisory_xact_lock(hashtextextended(${data.id}, 2))`;
+    let [post] = await tx`select * from posts where id = ${data.id} for update`;
+    if (creating && !post) {
+      const at = new Date();
+      const day =
+        data.publishedDay ||
+        publicationDay(at, process.env.BLOG_TIME_ZONE || undefined);
+      const slug = `${slugBase(data.title)}-${data.id}`;
+      [post] =
+        await tx`insert into posts (id, slug, published_at, published_day) values (${data.id}, ${slug}, ${at}, ${day}) returning *`;
+    }
     if (!post) throw new InputError("This post no longer exists.");
     if (post.version !== data.version)
       throw new InputError(
         "This post changed in another tab. Copy your edits, then reload before saving.",
-      );
-    if (post.published && data.intent === "draft")
-      throw new InputError(
-        "Use Save changes or Unpublish for a published post.",
       );
     const ids = data.images.map((image) => image.id);
     // Lock pending-object markers before images so maintenance cannot delete a selected upload.
     if (ids.length)
       await tx`select object_key from storage_cleanup where object_key in (select object_key from post_images where id in ${tx(ids)}) order by object_key for update`;
     const selected = ids.length
-      ? await tx`select * from post_images where post_id = ${data.id} and id in ${tx(ids)} for update`
+      ? await tx`select * from post_images where (post_id = ${data.id} or post_id is null) and id in ${tx(ids)} order by id for update`
       : [];
     if (selected.length !== ids.length)
       throw new InputError(
@@ -191,31 +203,15 @@ export async function savePost(
     for (const image of selected) {
       const position = ids.indexOf(image.id);
       const alt = data.images[position].alt;
-      await tx`update post_images set active = true, alt = ${alt}, position = ${position} where id = ${image.id}`;
+      await tx`update post_images set post_id = ${data.id}, active = true, alt = ${alt}, position = ${position} where id = ${image.id}`;
       await tx`delete from storage_cleanup where object_key = ${image.object_key}`;
     }
     for (const image of old.filter((i) => !ids.includes(i.id))) {
       await tx`insert into storage_cleanup (object_key, not_before) values (${image.object_key}, now() + interval '24 hours') on conflict (object_key) do nothing`;
     }
-    let slug = post.slug as string | null;
-    if (!slug && data.intent === "publish") {
-      // Serialize slug allocation to make title collisions safe across concurrent owners/tabs.
-      await tx`select pg_advisory_xact_lock(78234622)`;
-      slug = slugBase(data.title);
-      if ((await tx`select id from posts where slug = ${slug}`).length)
-        slug = `${slug}-${randomUUID().slice(0, 8)}`;
-    }
-    const publishedAt =
-      post.published_at ?? (data.intent === "publish" ? new Date() : null);
-    const publishedDay =
-      data.publishedDay ||
-      post.published_day ||
-      (publishedAt
-        ? publicationDay(publishedAt, process.env.BLOG_TIME_ZONE || undefined)
-        : null);
+    const publishedDay = data.publishedDay || post.published_day;
     await tx`update posts set title = ${data.title}, paragraph_one = ${data.paragraphOne}, paragraph_two = ${data.paragraphTwo}, video_id = ${data.videoId}, video_ids = ${tx.array(data.videoIds)},
-      slug = ${slug}, published = ${data.intent === "publish"},
-      published_at = ${publishedAt}, published_day = ${publishedDay}, updated_at = now(), version = version + 1 where id = ${data.id}`;
+      published_day = ${publishedDay}, updated_at = now(), version = version + 1 where id = ${data.id}`;
   };
   if (transaction) await apply(transaction);
   else await db().begin(apply);

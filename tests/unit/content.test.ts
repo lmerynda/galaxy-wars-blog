@@ -29,24 +29,24 @@ describe("post boundaries", () => {
   ])("rejects unsupported links: %s", (link) =>
     expect(() => youtubeId(link)).toThrow(),
   );
-  it("allows omitted video, normalizes paragraphs, and enforces publication", () => {
-    const draft = {
+  it("validates every save and normalizes paragraphs", () => {
+    const input = {
       id: randomUUID(),
       version: 0,
-      title: "",
+      title: "Entry",
       paragraphOne: " first\n\nsecond ",
-      paragraphTwo: "",
+      paragraphTwo: "After",
       youtubeUrl: "",
       beforeId: "",
       afterId: "",
       beforeAlt: "",
       afterAlt: "",
-      intent: "draft",
+      images: [],
     };
-    expect(validatePost(draft).paragraphOne).toBe("first second");
-    expect(validatePost(draft).videoId).toBeNull();
+    expect(validatePost(input).paragraphOne).toBe("first second");
+    expect(validatePost(input).videoId).toBeNull();
     expect(
-      validatePost({ ...draft, publishedDay: "2024-02-29" }).publishedDay,
+      validatePost({ ...input, publishedDay: "2024-02-29" }).publishedDay,
     ).toBe("2024-02-29");
     for (const publishedDay of [
       "2025-02-29",
@@ -54,27 +54,25 @@ describe("post boundaries", () => {
       "0000-01-01",
       "09/01/2026",
     ])
-      expect(() => validatePost({ ...draft, publishedDay })).toThrow();
+      expect(() => validatePost({ ...input, publishedDay })).toThrow();
     expect(
       validatePost({
-        ...draft,
+        ...input,
         youtubeUrls: Array(100).fill("https://youtu.be/dQw4w9WgXcQ"),
       }).videoIds,
     ).toHaveLength(100);
     expect(() =>
-      validatePost({ ...draft, youtubeUrls: ["https://evil.test/video"] }),
+      validatePost({ ...input, youtubeUrls: ["https://evil.test/video"] }),
     ).toThrow();
     expect(
       validatePost({
-        ...draft,
+        ...input,
         youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
         youtubeUrls: [],
       }).videoIds,
     ).toEqual([]);
-    expect(() => validatePost({ ...draft, intent: "publish" })).toThrow(
-      /To publish/,
-    );
-    expect(() => validatePost({ ...draft, title: "x".repeat(121) })).toThrow();
+    expect(() => validatePost({ ...input, title: "" })).toThrow();
+    expect(() => validatePost({ ...input, title: "x".repeat(121) })).toThrow();
   });
   it("creates readable bounded slugs", () => {
     expect(slugBase("  A clearer Gálaxy! ")).toBe("a-clearer-galaxy");

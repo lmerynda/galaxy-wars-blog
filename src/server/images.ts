@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "./db";
 import { requireOwner, sessionValid, type OwnerCredential } from "./auth";
 import { deleteObject, getObject, putObject } from "./storage";
-import { InputError, type PostImage, type Role } from "../lib/post";
+import { InputError, type PostImage } from "../lib/post";
 import { OperationError } from "./diagnostics";
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export async function inspectImage(bytes: Buffer, mime: string) {
@@ -48,25 +48,16 @@ export async function inspectImage(bytes: Buffer, mime: string) {
 }
 export async function uploadImage(
   token: OwnerCredential,
-  postId: string,
-  role: string,
   bytes: Buffer,
   mime: string,
   transaction?: TransactionSql,
   pendingId?: string,
 ): Promise<PostImage> {
   await requireOwner(token);
-  if (
-    !z.uuid().safeParse(postId).success ||
-    !["before", "after", "gallery"].includes(role)
-  )
-    throw new InputError("Invalid screenshot destination.");
   const sql = transaction ?? db();
-  if (!(await sql`select id from posts where id = ${postId}`).length)
-    throw new InputError("This draft no longer exists.");
   const meta = await inspectImage(bytes, mime);
   const id = pendingId ?? randomUUID(),
-    key = `posts/${postId}/${id}`;
+    key = `uploads/${id}`;
   // A durable marker exists even if the process stops between upload and the image insert.
   if (!pendingId)
     await db()`insert into storage_cleanup (object_key, not_before) values (${key}, now() + interval '24 hours')`;
@@ -76,13 +67,13 @@ export async function uploadImage(
     throw new OperationError("storage.putObject", error);
   }
   try {
-    await sql`insert into post_images (id, post_id, role, object_key, mime, width, height, bytes) values (${id}, ${postId}, ${role}, ${key}, ${meta.mime}, ${meta.width}, ${meta.height}, ${meta.bytes})`;
+    await sql`insert into post_images (id, role, object_key, mime, width, height, bytes) values (${id}, ${"gallery"}, ${key}, ${meta.mime}, ${meta.width}, ${meta.height}, ${meta.bytes})`;
   } catch (error) {
     throw new OperationError("database.insertImage", error);
   }
   return {
     id,
-    role: role as Role,
+    role: "gallery",
     url: `/media/${id}`,
     width: meta.width,
     height: meta.height,
@@ -92,7 +83,7 @@ export async function uploadImage(
 export async function readImage(id: string, token?: string) {
   if (!z.uuid().safeParse(id).success) return null;
   const [row] =
-    await db()`select i.object_key, i.mime, i.bytes, (p.published and i.active) as public from post_images i join posts p on p.id = i.post_id where i.id = ${id}`;
+    await db()`select i.object_key, i.mime, i.bytes, (i.post_id is not null and i.active) as public from post_images i where i.id = ${id}`;
   if (!row || (!row.public && !(await sessionValid(token)))) return null;
   const result = await getObject(row.object_key);
   return {

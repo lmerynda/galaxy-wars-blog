@@ -405,9 +405,6 @@ p {
 .button-primary:hover {
   background: #ddff9a;
 }
-.button-danger {
-  color: var(--danger);
-}
 .back-link {
   display: inline-block;
   font-size: 0.8rem;
@@ -495,23 +492,6 @@ p {
   color: var(--muted);
   padding: 13px 18px;
   border-top: 1px solid var(--line);
-}
-.image-empty {
-  aspect-ratio: 16/9;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  color: var(--muted);
-  background: #0d120f;
-}
-.image-symbol {
-  display: block;
-  font-size: 2rem;
-  color: #819671;
-  font-weight: 300;
-  margin-bottom: 8px;
 }
 .video-link {
   display: flex;
@@ -919,12 +899,6 @@ textarea {
 .login-form .form-error {
   margin-top: 12px;
 }
-.preview-surface {
-  padding: 20px 30px 30px;
-}
-.preview-surface .post-header {
-  margin-top: 20px;
-}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1148,9 +1122,6 @@ textarea {
   }
   .save-bar .actions .button {
     flex: 1;
-  }
-  .preview-surface {
-    padding: 20px 16px;
   }
   .pagination .button {
     font-size: 0.69rem;

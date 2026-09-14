@@ -2,7 +2,7 @@ import { z } from "zod";
 import { postInput } from "../lib/post";
 import { MAX_IMAGE_BYTES } from "./images";
 export const content = postInput
-  .omit({ id: true, version: true, intent: true })
+  .omit({ id: true, version: true })
   .extend({
     beforeId: postInput.shape.beforeId.default(""),
     afterId: postInput.shape.afterId.default(""),
@@ -17,8 +17,11 @@ export const revision = z
 export function apiHelp() {
   return {
     apiVersion: "v1",
-    helpVersion: 1,
+    helpVersion: 2,
     basePath: "/api/v1",
+    workflow: "save-to-public",
+    breakingChange:
+      "POST and PUT now save publicly. The publish endpoint and post-specific image upload endpoints are removed. Old mutation keys cannot be replayed across this change; use fresh keys. Upload through POST /api/v1/images.",
     authentication: {
       header: "Authorization",
       scheme: "Bearer",
@@ -37,33 +40,25 @@ export function apiHelp() {
         method: "POST",
         path: "/api/v1/posts",
         requestSchema: "create",
-        description: "Create a private draft.",
+        description: "Create an entry immediately visible on the public log.",
       },
       {
         method: "GET",
         path: "/api/v1/posts/{id}",
-        description:
-          "Read current content, version and URLs, including private drafts.",
+        description: "Read current content, version and URLs.",
       },
       {
         method: "PUT",
         path: "/api/v1/posts/{id}",
         requestSchema: "update",
         description:
-          "Replace a draft's complete content using its current version. Live edits are owner-editor only.",
+          "Replace the entry's complete content using its current version. Changes are immediately public.",
       },
       {
         method: "POST",
-        path: "/api/v1/posts/{id}/images/{role}",
+        path: "/api/v1/images",
         description:
-          "Upload raw image bytes (not multipart or JSON). role: gallery, before or after. Returns {image}. Save its ID in images before publishing.",
-      },
-      {
-        method: "POST",
-        path: "/api/v1/posts/{id}/publish",
-        requestSchema: "publish",
-        description:
-          "Publish saved draft content using its current version. Does not accept content fields.",
+          "Upload raw image bytes (not multipart or JSON). Returns {image}. Upload before creating an entry; save its ID in images to attach it.",
       },
     ],
     requestSchemas: {
@@ -72,17 +67,15 @@ export function apiHelp() {
         content.extend({ version: revision.shape.version }).strict(),
         { io: "input" },
       ),
-      publish: z.toJSONSchema(revision),
     },
     dates: {
       field: "publishedDay",
       format: "YYYY-MM-DD",
       validation: "Real calendar date, year 0001–9999.",
       behavior:
-        "Sets daily grouping; can be backdated. Omitted or empty preserves a saved date, otherwise defaults to the blog's publication day. Does not schedule publication. Original publication timestamp is retained.",
+        "Sets daily grouping; can be backdated. Omitted or empty preserves a saved date, otherwise defaults to the day of the first save in the blog timezone. Future dates are also public immediately. Original first-save timestamp is retained.",
       timeZone: process.env.BLOG_TIME_ZONE || "America/Chicago",
-      liveDateEdits:
-        "Use the owner editor to move a published entry to another day.",
+      dateEdits: "Use PUT or the owner editor to move an entry to another day.",
     },
     images: {
       countLimit: null,
@@ -91,9 +84,9 @@ export function apiHelp() {
       contentTypes: ["image/png", "image/jpeg", "image/webp"],
       stillOnly: true,
       selection:
-        "Send the complete ordered images array of {id, alt}. IDs must be unique and belong to the post. Empty array allows text-only posts. Unselected uploads are eligible for cleanup after 24 hours.",
+        "Send the complete ordered images array of {id, alt}. IDs must be unique and unassigned or already attached to this entry. Empty array allows text-only posts. Unselected uploads are eligible for cleanup after 24 hours.",
       legacy:
-        "If images is omitted, beforeId/afterId and beforeAlt/afterAlt are used. Legacy publication requires both images.",
+        "If images is omitted, beforeId/afterId and beforeAlt/afterAlt are used. Prefer the images array.",
     },
     videos: {
       field: "youtubeUrls",
@@ -104,9 +97,11 @@ export function apiHelp() {
       legacy:
         "youtubeUrl is accepted if youtubeUrls is omitted. videoIds is returned; videoId remains the first video for compatibility.",
     },
-    publication:
-      "A nonempty title, both paragraphs, and alt descriptions for every selected image are required. Create a draft, upload and select images, review, GET the current version, then explicitly publish.",
+    saving:
+      "A nonempty title, both paragraphs, and alt descriptions for every selected image are required. Upload images first, then POST complete content. GET the current version before PUT. All saves are public immediately; no separate publish step exists.",
     requests: {
+      replacement:
+        "POST and PUT take complete content. Omitted image/video selections are empty; send the full arrays to retain them. Omitted or empty publishedDay preserves an existing date.",
       jsonContentType: "application/json",
       maxJsonBytes: 256 * 1024,
       unknownFields: "rejected",
@@ -118,7 +113,7 @@ export function apiHelp() {
     },
     responses: {
       successStatus: 200,
-      postEnvelope: "{post, previewUrl, publicUrl}",
+      postEnvelope: "{post, editUrl, publicUrl}",
       postFields: [
         "id",
         "slug",
@@ -127,21 +122,20 @@ export function apiHelp() {
         "paragraphTwo",
         "videoId",
         "videoIds",
-        "published",
         "publishedAt",
         "publishedDay",
         "version",
         "images",
       ],
       imageFields: ["id", "role", "url", "width", "height", "alt"],
-      urls: "Relative to this blog's origin. previewUrl requires owner login; publicUrl is null for drafts.",
+      urls: "Relative to this blog's origin. editUrl requires owner login; publicUrl is always available.",
       cacheControl: "no-store",
       requestIdHeader: "X-Request-ID",
       errors: {
         400: "Invalid input or key",
         401: "Invalid or disabled token",
         404: "Unknown endpoint or post",
-        409: "Version, publication state or idempotency conflict",
+        409: "Version or idempotency conflict",
         413: "Request too large",
         415: "Wrong JSON content type",
         503: "Temporary failure; JSON also includes requestId",
@@ -157,7 +151,7 @@ export function apiHelp() {
         images: [],
         youtubeUrls: ["https://youtu.be/dQw4w9WgXcQ"],
       },
-      updateDraft: {
+      updateEntry: {
         version: 1,
         title: "Clearer targeting",
         paragraphOne: "Previously, nearby ships were difficult to select.",
@@ -167,13 +161,8 @@ export function apiHelp() {
         images: [],
         youtubeUrls: [],
       },
-      publish: { version: 2 },
     },
-    ownerEditorOnly: [
-      "Edit or unpublish live entries",
-      "Create/edit/close polls",
-      "Moderate threaded comments",
-    ],
+    ownerEditorOnly: ["Create/edit/close polls", "Moderate threaded comments"],
     unsupportedApiOperations: [
       "List or delete posts",
       "Upload video files",

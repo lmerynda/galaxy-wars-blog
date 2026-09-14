@@ -9,7 +9,7 @@ import {
   logout,
 } from "@/server/auth";
 import { mutationToken, safeAdminPath, safeError } from "@/server/http";
-import { createPost, savePost } from "@/server/posts";
+import { savePost } from "@/server/posts";
 import type { PostInput } from "@/lib/post";
 
 export async function signIn(_: { error: string }, form: FormData) {
@@ -39,13 +39,16 @@ export async function signOut() {
   (await cookies()).delete(COOKIE);
   redirect("/admin/login");
 }
-export async function newPost() {
-  const id = await createPost(await mutationToken());
-  redirect(`/admin/posts/${id}/edit`);
-}
 export async function save(input: PostInput) {
   try {
-    return { post: await savePost(await mutationToken(), input) };
+    return {
+      post: await savePost(
+        await mutationToken(),
+        input,
+        undefined,
+        input.version === 0,
+      ),
+    };
   } catch (error) {
     return { error: safeError(error) };
   }

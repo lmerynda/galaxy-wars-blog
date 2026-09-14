@@ -17,15 +17,14 @@ export const posts = pgTable(
   "posts",
   {
     id: uuid().primaryKey().defaultRandom(),
-    slug: text().unique(),
+    slug: text().notNull().unique(),
     title: text().notNull().default(""),
     paragraphOne: text("paragraph_one").notNull().default(""),
     paragraphTwo: text("paragraph_two").notNull().default(""),
     videoId: text("video_id"),
     videoIds: text("video_ids").array().notNull().default([]),
-    published: boolean().notNull().default(false),
-    publishedAt: timestamp("published_at", { withTimezone: true }),
-    publishedDay: date("published_day"),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+    publishedDay: date("published_day").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -34,24 +33,14 @@ export const posts = pgTable(
       .defaultNow(),
     version: integer().notNull().default(0),
   },
-  (t) => [
-    check(
-      "publication_metadata",
-      sql`not ${t.published} or (${t.slug} is not null and ${t.publishedAt} is not null and ${t.publishedDay} is not null)`,
-    ),
-    index("published_days")
-      .on(t.publishedDay, t.publishedAt)
-      .where(sql`${t.published}`),
-  ],
+  (t) => [index("entry_days").on(t.publishedDay, t.publishedAt)],
 );
 
 export const images = pgTable(
   "post_images",
   {
     id: uuid().primaryKey().defaultRandom(),
-    postId: uuid("post_id")
-      .notNull()
-      .references(() => posts.id, { onDelete: "cascade" }),
+    postId: uuid("post_id").references(() => posts.id, { onDelete: "cascade" }),
     role: text().notNull(),
     objectKey: text("object_key").notNull().unique(),
     mime: text().notNull(),

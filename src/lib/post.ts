@@ -18,7 +18,6 @@ export type Post = {
   paragraphTwo: string;
   videoId: string | null;
   videoIds: string[];
-  published: boolean;
   publishedAt: string | null;
   publishedDay: string | null;
   version: number;
@@ -59,37 +58,38 @@ export const videoUrl = (id: string) => `https://www.youtube.com/watch?v=${id}`;
 const paragraph = z
   .string()
   .transform((v) => v.replace(/\s+/g, " ").trim())
-  .pipe(z.string().max(1500));
-export const postInput = z.object({
-  id: z.uuid(),
-  version: z.number().int().nonnegative(),
-  publishedDay: z
-    .string()
-    .refine(
-      (value) => value === "" || (isDay(value) && value >= "0001-01-01"),
-      "Enter a valid entry date.",
-    )
-    .optional(),
-  title: z.string().trim().max(120),
-  paragraphOne: paragraph,
-  paragraphTwo: paragraph,
-  youtubeUrl: z.string().max(2048).default(""),
-  youtubeUrls: z.array(z.string().max(2048)).optional(),
-  beforeId: z.union([z.uuid(), z.literal("")]),
-  afterId: z.union([z.uuid(), z.literal("")]),
-  beforeAlt: z.string().trim().max(200),
-  afterAlt: z.string().trim().max(200),
-  images: z
-    .array(z.object({ id: z.uuid(), alt: z.string().trim().max(200) }))
-    .optional(),
-  intent: z.enum(["draft", "publish", "unpublish"]),
-});
+  .pipe(z.string().min(1).max(1500));
+export const postInput = z
+  .object({
+    id: z.uuid(),
+    version: z.number().int().nonnegative(),
+    publishedDay: z
+      .string()
+      .refine(
+        (value) => value === "" || (isDay(value) && value >= "0001-01-01"),
+        "Enter a valid entry date.",
+      )
+      .optional(),
+    title: z.string().trim().min(1).max(120),
+    paragraphOne: paragraph,
+    paragraphTwo: paragraph,
+    youtubeUrl: z.string().max(2048).default(""),
+    youtubeUrls: z.array(z.string().max(2048)).optional(),
+    beforeId: z.union([z.uuid(), z.literal("")]).default(""),
+    afterId: z.union([z.uuid(), z.literal("")]).default(""),
+    beforeAlt: z.string().trim().max(200).default(""),
+    afterAlt: z.string().trim().max(200).default(""),
+    images: z
+      .array(z.object({ id: z.uuid(), alt: z.string().trim().max(200) }))
+      .optional(),
+  })
+  .strict();
 export type PostInput = z.input<typeof postInput>;
 export function validatePost(input: unknown) {
   const parsed = postInput.safeParse(input);
   if (!parsed.success)
     throw new InputError(
-      "Check the field lengths and screenshot selections, then try again.",
+      "Add a title and both paragraphs, and check the field lengths and image selections.",
     );
   const data = parsed.data;
   const videoIds = (data.youtubeUrls ?? [data.youtubeUrl])
@@ -105,15 +105,13 @@ export function validatePost(input: unknown) {
   if (new Set(images.map((image) => image.id)).size !== images.length)
     throw new InputError("Choose each image only once.");
   if (
-    data.intent === "publish" &&
-    (!data.title ||
-      !data.paragraphOne ||
-      !data.paragraphTwo ||
-      (data.images === undefined && (!data.beforeId || !data.afterId)) ||
-      images.some((image) => !image.alt))
+    !data.title ||
+    !data.paragraphOne ||
+    !data.paragraphTwo ||
+    images.some((image) => !image.alt)
   ) {
     throw new InputError(
-      "To publish, add a title, both paragraphs, and descriptions for every image.",
+      "Add a title, both paragraphs, and descriptions for every image.",
     );
   }
   return {
@@ -144,5 +142,5 @@ export function formatDate(value: string | null) {
         day: "numeric",
         timeZone: "UTC",
       }).format(new Date(value))
-    : "Unpublished draft";
+    : "New entry";
 }

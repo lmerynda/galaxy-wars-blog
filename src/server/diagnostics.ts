@@ -14,7 +14,7 @@ export class StorageConfigurationError extends Error {
   }
 }
 // Deliberately omit raw messages, stacks, SQL, request headers and SDK request objects:
-// these can include credentials, signed URLs, or draft content.
+// these can include credentials, signed URLs, or entry content.
 export function errorDetails(
   error: unknown,
   depth = 0,

@@ -38,9 +38,6 @@ export default async function Admin() {
               key={post.id}
             >
               <div>
-                <span className={`badge ${post.published ? "badge-live" : ""}`}>
-                  {post.published ? "Published" : "Draft"}
-                </span>
                 <h3>{post.title || "Untitled update"}</h3>
                 <p className="muted">{formatDate(post.publishedDay)}</p>
               </div>
@@ -51,8 +48,8 @@ export default async function Admin() {
           <div className="admin-empty">
             <h3>Your next change starts here.</h3>
             <p className="muted">
-              Add two paragraphs and a screenshot pair. Publish when you’re
-              ready.
+              Add two paragraphs and any images or videos. Save to share your
+              update.
             </p>
             <Link className="button" href="/admin/new">
               Write the first update →

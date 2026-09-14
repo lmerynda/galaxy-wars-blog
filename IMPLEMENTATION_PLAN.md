@@ -1,6 +1,6 @@
 # Galaxy Wars progress blog
 
-Status: implemented and locally validated; Railway deployment remains pending.
+Historical plan for the initial implementation. Current save behavior is described in [docs/plans/save-to-public-flow.md](docs/plans/save-to-public-flow.md); draft and publication controls have been removed.
 Date: 2026-09-10
 
 ## Goal

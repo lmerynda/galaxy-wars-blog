@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, it, expect, vi } from "vitest";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { prepareTestDatabase } from "../support/database";
 import { handleApi } from "../../src/server/api";
@@ -9,8 +9,8 @@ import { readImage } from "../../src/server/images";
 import { sessionValid } from "../../src/server/auth";
 
 const token = "api-integration-only-" + "a".repeat(64);
-const draft = {
-  title: "API draft",
+const entry = {
+  title: "API entry",
   paragraphOne: "Before the change.",
   paragraphTwo: "After the change.",
   youtubeUrl: "",
@@ -18,11 +18,12 @@ const draft = {
   afterId: "",
   beforeAlt: "Before",
   afterAlt: "After",
+  images: [],
 };
 function call(
   path: string[],
   method = "POST",
-  body: unknown = draft,
+  body: unknown = entry,
   key: string = randomUUID(),
   credential = token,
 ) {
@@ -52,44 +53,45 @@ afterAll(async () => {
 });
 it("requires a separate token, fails closed and rejects invalid requests", async () => {
   expect(
-    (await call(["posts"], "POST", draft, randomUUID(), "wrong")).status,
+    (await call(["posts"], "POST", entry, randomUUID(), "wrong")).status,
   ).toBe(401);
   delete process.env.BLOG_API_TOKEN;
   expect((await call(["posts"])).status).toBe(401);
   process.env.BLOG_API_TOKEN = token;
   expect(await sessionValid(token)).toBe(false);
   expect(
-    (await call(["posts"], "POST", { ...draft, intent: "publish" })).status,
+    (await call(["posts"], "POST", { ...entry, intent: "publish" })).status,
   ).toBe(400);
-  expect((await call(["posts"], "POST", draft, "short")).status).toBe(400);
+  expect((await call(["posts"], "POST", entry, "short")).status).toBe(400);
   expect(
-    (await call(["posts"], "POST", { ...draft, title: "x".repeat(300000) }))
+    (await call(["posts"], "POST", { ...entry, title: "x".repeat(300000) }))
       .status,
   ).toBe(413);
 });
 it("deduplicates concurrent creates and persists receipts across connection restarts", async () => {
   const key = randomUUID();
   const responses = await Promise.all([
-    call(["posts"], "POST", draft, key),
-    call(["posts"], "POST", draft, key),
+    call(["posts"], "POST", entry, key),
+    call(["posts"], "POST", entry, key),
   ]);
   const a = await responses[0].json(),
     b = await responses[1].json();
   expect(a).toEqual(b);
-  expect(a.post.published).toBe(false);
-  expect(a.previewUrl).toBe(`/admin/posts/${a.post.id}/edit`);
+  expect(a.post).not.toHaveProperty("published");
+  expect(a.publicUrl).toContain(a.post.id);
+  expect(a.editUrl).toBe(`/admin/posts/${a.post.id}/edit`);
   expect(
-    (await call(["posts"], "POST", { ...draft, title: "Different" }, key))
+    (await call(["posts"], "POST", { ...entry, title: "Different" }, key))
       .status,
   ).toBe(409);
   await closeDb();
-  expect(await (await call(["posts"], "POST", draft, key)).json()).toEqual(a);
+  expect(await (await call(["posts"], "POST", entry, key)).json()).toEqual(a);
   const rows = await db()`select id from posts where id = ${a.post.id}`;
   expect(rows).toHaveLength(1);
 });
-it("rolls back the draft if its retry receipt cannot be saved", async () => {
+it("rolls back the entry if its retry receipt cannot be saved", async () => {
   const key = randomUUID();
-  const body = { ...draft, title: "receipt-rollback" };
+  const body = { ...entry, title: "receipt-rollback" };
   const log = vi.spyOn(console, "error").mockImplementation(() => {});
   await db()`alter table api_requests add constraint test_receipt_failure check (response->'post'->>'title' <> 'receipt-rollback')`;
   try {
@@ -117,23 +119,16 @@ it("rolls back the draft if its retry receipt cannot be saved", async () => {
   }
   expect((await call(["posts"], "POST", body, key)).status).toBe(200);
 });
-it("uploads privately, saves a draft, publishes explicitly and rejects stale writes", async () => {
-  const { post } = await (await call(["posts"])).json();
-  expect(
-    (
-      await call(["posts", post.id, "publish"], "POST", {
-        version: post.version + 1,
-      })
-    ).status,
-  ).toBe(409);
+it("uploads before creating entries and edits publicly with safe retries", async () => {
   const png = await sharp({
     create: { width: 64, height: 64, channels: 3, background: "#234567" },
   })
     .png()
     .toBuffer();
-  async function upload(role: string, key: string) {
+  const key = randomUUID();
+  async function upload() {
     return handleApi(
-      new Request("http://localhost/api", {
+      new Request("http://localhost/api/v1/images", {
         method: "POST",
         headers: {
           authorization: `Bearer ${token}`,
@@ -142,55 +137,52 @@ it("uploads privately, saves a draft, publishes explicitly and rejects stale wri
         },
         body: png,
       }),
-      ["posts", post.id, "images", role],
+      ["images"],
     );
   }
-  const key = randomUUID();
-  const before = await (await upload("before", key)).json();
-  expect(await (await upload("before", key)).json()).toEqual(before);
-  expect(await readImage(before.image.id)).toBeNull();
-  const after = await (await upload("after", randomUUID())).json();
+  const imageResponse = await upload();
+  expect(imageResponse.status).toBe(200);
+  const { image } = await imageResponse.json();
+  expect((await (await upload()).json()).image.id).toBe(image.id);
+  expect(await readImage(image.id)).toBeNull();
+  const created = await (
+    await call(["posts"], "POST", {
+      ...entry,
+      images: [{ id: image.id, alt: "Before" }],
+    })
+  ).json();
+  const post = created.post;
+  expect(created.publicUrl).toContain(post.id);
+  const bytes = await readImage(image.id);
+  expect(bytes).not.toBeNull();
+  await bytes?.body?.cancel();
   const input = {
-    ...draft,
+    ...entry,
     version: post.version,
-    beforeId: before.image.id,
-    afterId: after.image.id,
+    title: "Corrected live entry",
+    publishedDay: "2021-01-01",
+    images: [{ id: image.id, alt: "Corrected caption" }],
   };
   const updateKey = randomUUID();
   const saved = await (
     await call(["posts", post.id], "PUT", input, updateKey)
   ).json();
-  expect(saved.post.published).toBe(false);
-  expect(saved.post.images).toHaveLength(2);
+  expect(saved.post.title).toBe(input.title);
+  expect(saved.publicUrl).toContain("2021-01-01");
   expect(
     await (await call(["posts", post.id], "PUT", input, updateKey)).json(),
   ).toEqual(saved);
   expect((await call(["posts", post.id], "PUT", input)).status).toBe(409);
-  const publishKey = randomUUID();
-  const publishBody = { version: saved.post.version };
-  const published = await (
-    await call(["posts", post.id, "publish"], "POST", publishBody, publishKey)
-  ).json();
-  expect(published.post.published).toBe(true);
-  expect(published.publicUrl).toBe(
-    `/days/${published.post.publishedDay}#entry-${post.id}`,
-  );
-  expect(
-    await (
-      await call(["posts", post.id, "publish"], "POST", publishBody, publishKey)
-    ).json(),
-  ).toEqual(published);
   expect(
     (
-      await call(["posts", post.id], "PUT", {
-        ...input,
-        version: published.post.version,
+      await call(["posts", post.id, "publish"], "POST", {
+        version: saved.post.version,
       })
     ).status,
-  ).toBe(409);
-  const image = await readImage(before.image.id);
-  expect(image).not.toBeNull();
-  await image?.body?.cancel();
+  ).toBe(404);
+  expect((await call(["posts", post.id, "images", "gallery"])).status).toBe(
+    404,
+  );
   process.env.BLOG_API_TOKEN = "rotated-" + token;
   expect((await call(["posts", post.id], "GET")).status).toBe(401);
   process.env.BLOG_API_TOKEN = token;
@@ -222,7 +214,7 @@ it("accepts an ordered API gallery without legacy pair fields", async () => {
         },
         body: png,
       }),
-      ["posts", post.id, "images", "gallery"],
+      ["images"],
     );
     expect(response.status).toBe(200);
     const { image } = await response.json();
@@ -239,23 +231,17 @@ it("accepts an ordered API gallery without legacy pair fields", async () => {
   expect(saved.post.images.map((i: { id: string }) => i.id)).toEqual(
     ordered.map((i) => i.id),
   );
-  const published = await (
-    await call(["posts", post.id, "publish"], "POST", {
-      version: saved.post.version,
-    })
-  ).json();
-  expect(published.post.images).toHaveLength(3);
-  expect(published.post.published).toBe(true);
+  expect(saved.post.images).toHaveLength(3);
 });
 
-it("preserves ordered videos through creation, publication and clearing", async () => {
+it("preserves ordered videos through creation and clearing", async () => {
   const youtubeUrls = [
     "https://youtu.be/dQw4w9WgXcQ",
     "https://youtu.be/abcdefghijk",
     "https://youtu.be/12345678901",
   ];
   const created = await call(["posts"], "POST", {
-    ...draft,
+    ...entry,
     images: [],
     youtubeUrls,
     publishedDay: "2024-01-15",
@@ -263,21 +249,11 @@ it("preserves ordered videos through creation, publication and clearing", async 
   expect(created.status).toBe(200);
   const { post } = await created.json();
   expect(post.videoIds).toEqual(["dQw4w9WgXcQ", "abcdefghijk", "12345678901"]);
-  const published = await call(["posts", post.id, "publish"], "POST", {
+  expect(post.publishedDay).toBe("2024-01-15");
+  const cleared = await call(["posts", post.id], "PUT", {
+    ...entry,
     version: post.version,
-  });
-  expect(published.status).toBe(200);
-  const publishedPost = (await published.json()).post;
-  expect(publishedPost.videoIds).toEqual(post.videoIds);
-  expect(publishedPost.publishedDay).toBe("2024-01-15");
-  const legacy = await (
-    await call(["posts"], "POST", { ...draft, youtubeUrl: youtubeUrls[0] })
-  ).json();
-  expect(legacy.post.videoIds).toEqual(["dQw4w9WgXcQ"]);
-  const cleared = await call(["posts", legacy.post.id], "PUT", {
-    ...draft,
     youtubeUrls: [],
-    version: legacy.post.version,
   });
   expect(cleared.status).toBe(200);
   expect((await cleared.json()).post.videoIds).toEqual([]);
@@ -311,7 +287,7 @@ it("serves authenticated capability help with usable schemas and examples", asyn
   expect(created.status).toBe(200);
   const { post } = await created.json();
   const updated = await call(["posts", post.id], "PUT", {
-    ...help.examples.updateDraft,
+    ...help.examples.updateEntry,
     version: post.version,
   });
   expect(updated.status).toBe(200);
@@ -324,4 +300,14 @@ it("serves authenticated capability help with usable schemas and examples", asyn
   } finally {
     process.env.BLOG_API_TOKEN = token;
   }
+});
+
+it("rejects pre-upgrade receipts instead of replaying obsolete responses", async () => {
+  const key = randomUUID();
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify(["POST", ["posts"], "application/json"]))
+    .update(JSON.stringify(entry))
+    .digest("hex");
+  await db()`insert into api_requests(key,fingerprint,response) values (${key},${fingerprint},'{}'::jsonb)`;
+  expect((await call(["posts"], "POST", entry, key)).status).toBe(409);
 });

@@ -4,11 +4,9 @@ import { entryAnchor } from "@/lib/day";
 
 export function PostView({
   post,
-  preview = false,
   entryNumber,
 }: {
   post: Post;
-  preview?: boolean;
   entryNumber?: number;
 }) {
   const Heading = entryNumber ? "h2" : "h1";
@@ -19,13 +17,11 @@ export function PostView({
     >
       <header className="post-header">
         <div className="eyebrow">
-          {preview
-            ? "Preview · only visible to you"
-            : entryNumber
-              ? `${String(entryNumber).padStart(2, "0")} / Development update`
-              : "Development update"}
+          {entryNumber
+            ? `${String(entryNumber).padStart(2, "0")} / Development update`
+            : "Development update"}
         </div>
-        <Heading>{post.title || "Your next chapter"}</Heading>
+        <Heading>{post.title || "Untitled update"}</Heading>
         {entryNumber ? (
           <a
             className="entry-permalink"
@@ -46,13 +42,8 @@ export function PostView({
         )}
       </header>
       <div className="post-copy">
-        <p>
-          {post.paragraphOne || "Describe what needed improvement and why."}
-        </p>
-        <p>
-          {post.paragraphTwo ||
-            "Explain what changed and what players can now see or do."}
-        </p>
+        <p>{post.paragraphOne}</p>
+        <p>{post.paragraphTwo}</p>
       </div>
       <section className="comparison" aria-label="Image gallery">
         {post.images.map((image, index) => {
@@ -63,31 +54,22 @@ export function PostView({
                 <span className="eyebrow">
                   {role === "gallery" ? `Image ${index + 1}` : role}
                 </span>
-                <span className="muted">
-                  {image ? "Open full resolution ↗" : "Screenshot preview"}
-                </span>
+                <span className="muted">Open full resolution ↗</span>
               </figcaption>
-              {image ? (
-                <a
-                  href={image.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Open ${role} screenshot in full resolution`}
-                >
-                  <img
-                    src={image.url}
-                    width={image.width}
-                    height={image.height}
-                    alt={image.alt || `${role} screenshot`}
-                  />
-                </a>
-              ) : (
-                <div className="image-empty">
-                  <span className="image-symbol">＋</span>Add the {role}{" "}
-                  screenshot
-                </div>
-              )}
-              {image?.alt && <p className="image-caption">{image.alt}</p>}
+              <a
+                href={image.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${role} screenshot in full resolution`}
+              >
+                <img
+                  src={image.url}
+                  width={image.width}
+                  height={image.height}
+                  alt={image.alt || `${role} screenshot`}
+                />
+              </a>
+              {image.alt && <p className="image-caption">{image.alt}</p>}
             </figure>
           );
         })}
@@ -112,7 +94,7 @@ export function PostView({
           </a>
         </div>
       ))}
-      {!preview && post.published && <Discussion postId={post.id} />}
+      <Discussion postId={post.id} />
       {!entryNumber && (
         <div className="post-end">
           <span className="star-mark">✳</span>

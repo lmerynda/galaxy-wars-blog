@@ -9,9 +9,8 @@ async function requirePost(id: string, owner?: OwnerCredential) {
   if (!z.uuid().safeParse(id).success)
     throw new InputError("Update not found.");
   if (owner) await requireOwner(owner);
-  const [post] = await db()`select published from posts where id = ${id}`;
-  if (!post || (!post.published && !owner))
-    throw new InputError("Update not found.");
+  const [post] = await db()`select id from posts where id = ${id}`;
+  if (!post) throw new InputError("Update not found.");
 }
 export async function discussion(
   id: string,
@@ -73,8 +72,8 @@ export async function addComment(
     if (!z.uuid().safeParse(postId).success)
       throw new InputError("Update not found.");
     const [post] =
-      await tx`select published from posts where id = ${postId} for share`;
-    if (!post?.published) throw new InputError("Update not found.");
+      await tx`select id from posts where id = ${postId} for share`;
+    if (!post) throw new InputError("Update not found.");
     // Same client retries are serialized; successful retry IDs do not consume the limit.
     await tx`select pg_advisory_xact_lock(hashtextextended(${client}, 1))`;
     const [existing] = await tx`select * from comments where id = ${data.id}`;
@@ -115,8 +114,8 @@ export async function vote(postId: string, optionId: string, voter: string) {
     throw new InputError("Invalid vote.");
   await db().begin(async (tx) => {
     const [post] =
-      await tx`select published from posts where id = ${postId} for share`;
-    if (!post?.published) throw new InputError("Update not found.");
+      await tx`select id from posts where id = ${postId} for share`;
+    if (!post) throw new InputError("Update not found.");
     const [poll] =
       await tx`select * from polls where post_id = ${postId} for update`;
     if (!poll || poll.closed) throw new InputError("Voting is closed.");

@@ -36,21 +36,21 @@ npm run dev
 
 ## Writing an update
 
-1. Open `/admin` and sign in. Choose **New update**, then **Start writing**.
+1. Open `/admin` and sign in. Choose **New update**.
 2. Add a title and two short paragraphs: the original problem, then the change and its effect on players.
 3. Add any number of images, describe each one, and arrange them with **Move up**. **Remove** excludes an image on the next save. Uploads accept still PNG, JPEG, or WebP files up to 10 MiB and 32 megapixels each.
 4. Optionally add any number of HTTPS YouTube video links using **Add video**. Each renders as an embedded player, with a fallback link to YouTube. Existing single-video entries are preserved by the database migration.
-5. **Save draft** to keep work private; **Preview update** to inspect the current form; **Publish update** when ready.
+5. Choose **Save entry**. The complete entry is public immediately. Use **Save changes** to correct it later, including its date.
 
-Uploaded replacements stay private until a successful save. The editor retains entered text on errors, warns when leaving with unsaved edits, and prevents stale edits from another tab overwriting a newer save. Unsaved uploads expire after a 24-hour cleanup grace period; save a draft to retain them.
+Uploaded replacements stay private until a successful save. The editor retains entered text on errors, warns when leaving with unsaved edits, and prevents stale edits from another tab overwriting a newer save. Unsaved uploads expire after a 24-hour cleanup grace period; save the entry to retain them.
 
 Entries published on the same calendar day appear together at `/days/YYYY-MM-DD`. The homepage shows one card per day, with the entry count, up to three entry titles, and the latest entry's last gallery image. Pagination counts 12 whole days, so it never splits a day across pages. On the daily page, entries appear newest first, each with its own text, gallery, optional videos, and linkable section.
 
-Days use `BLOG_TIME_ZONE` (default `America/Chicago`), including daylight-saving changes. The day is saved at **first publication**, not draft creation. Later editing, unpublishing/republishing, or timezone configuration changes do not move an existing entry to a different day. There is no extra daily-page editing step: publish each entry normally and it joins its day's page automatically.
+Days use `BLOG_TIME_ZONE` (default `America/Chicago`). The day defaults to the first save and can be changed using **Entry date**. Saving a future date is not scheduling: the entry is public immediately. Editing does not change the original timestamp or reorder entries within a day.
 
-The editor's public link opens the entry's section on its daily page. Existing `/updates/[slug]` links redirect there as well. Changing a title preserves those links and the original publication date. **Unpublish** hides just that entry and its images; the daily page stays public if it has other published entries. A day disappears from the homepage and returns 404 when its last entry is unpublished. Previously downloaded or externally cached copies cannot be recalled. Permanent post deletion is intentionally omitted.
+The editor's public link opens the entry on its daily page. Existing `/updates/[slug]` links redirect to the current day. Titles can change without changing the slug. Permanent deletion is intentionally omitted.
 
-Migration `0001` backfills existing entries (including previously published drafts) using their original publication timestamp in `America/Chicago`. Fresh drafts remain unassigned until publication. Run migrations before starting the updated application; Railway's pre-deploy migration command handles this automatically.
+Migration `0005` makes **every existing record public**, including incomplete drafts, preserving saved text, selected images, dates and existing slugs. Missing timestamps use the original creation time; missing calendar dates use that time in `BLOG_TIME_ZONE`. Missing slugs are allocated uniquely. No text or image captions are invented. All record versions advance to reject stale editors. The publication flag and its constraint/index are removed. Apply the migration with the new application; an old application cannot run against the new schema.
 
 ## Railway deployment
 
@@ -62,7 +62,7 @@ Create one Railway project with three resources:
 
 Configure the app service in Railway Settings: build `npm run build`, pre-deploy `npm run db:migrate`, start `npm start`, and health check `/api/health`. The checked-in `railway.json` records these values for legacy services, but new Railway services no longer accept that configuration format as of August 28, 2026; do not rely on automatic discovery. The production service was configured directly in the Railway UI. `next start` reads Railway's `PORT`. The runtime migration/maintenance dependency `tsx` is a production dependency, so commands also work when development packages are pruned.
 
-For AI-assisted draft creation, screenshot uploads and explicit publishing, see [Publishing API](docs/publishing-api.md). Set the optional `BLOG_API_TOKEN` secret on the app service to enable it; it is independent of the owner password.
+For API entry creation, pre-entry image uploads and live corrections, see [Publishing API](docs/publishing-api.md). Set the optional `BLOG_API_TOKEN` secret on the app service to enable it; it is independent of the owner password.
 
 Set these **application service** variables using Railway resource references where possible:
 
@@ -88,10 +88,10 @@ After deployment:
 
 1. Confirm `/api/health` returns `{"status":"ok"}`.
 2. Run `npm run storage:check` in the deployed service context to verify bucket access.
-3. Sign in at `/admin`, publish a post, and open its URL and both images in an incognito browser.
+3. Sign in at `/admin`, save an entry, and open its URL and images in an incognito browser.
 4. Redeploy the application and verify the same post and images are still available.
 
-The application stores no persistent data on its container filesystem. Public media is delivered through app routes with `private, no-store` caching to enforce unpublishing. This favors simple access rules over CDN efficiency; revisit display variants and caching only if actual image traffic warrants it. Original images remain uncropped and available at full resolution.
+The application stores no persistent data on its container filesystem. Public media is delivered through app routes with `private, no-store` caching to keep unselected uploads private. This favors simple access rules over CDN efficiency; revisit display variants and caching only if actual image traffic warrants it. Original images remain uncropped and available at full resolution.
 
 Railway resources and domains have not been provisioned by this implementation. See [Railway's Next.js guide](https://docs.railway.com/guides/nextjs), [bucket guide](https://docs.railway.com/guides/storage-buckets-guide), and [network header reference](https://docs.railway.com/networking/public-networking/specs-and-limits).
 
@@ -108,7 +108,7 @@ Back up **both** PostgreSQL and the bucket. For a simple consistent backup:
 3. Verify the dump can be read and the copied objects' counts/sizes match; keep dated copies outside the running resources.
 4. Resume authoring and maintenance.
 
-Restore into a separate PostgreSQL database and private bucket first. Restore the dump with `pg_restore`, copy objects under the same keys, point a staging application at both, apply any newer committed migrations, and verify representative public and draft pages/images. Use a new owner password hash to revoke restored sessions. Switch the production configuration only after this check. Never restore only the database and assume screenshots are included.
+Restore into a separate PostgreSQL database and private bucket first. Restore the dump with `pg_restore`, copy objects under the same keys, point a staging application at both, apply any newer committed migrations, and verify representative public pages and selected images. Use a new owner password hash to revoke restored sessions. Switch the production configuration only after this check. Never restore only the database and assume screenshots are included.
 
 ## Checks
 
@@ -124,7 +124,7 @@ npm audit
 
 Integration and browser tests require `npm run services`. They create separate `galaxy_wars_blog_test` and `galaxy_wars_blog_e2e` databases on the dedicated local PostgreSQL port; test setup refuses other hosts/ports and resets only those named test databases. Never point tests at a production service.
 
-Browser tests start their own production server on **3018**, use an explicitly test-only password, and exercise login, drafting, publication, screenshot access, editing, and unpublishing. They write ignored captures to `artifacts/visual` and failure traces to `test-results`. Set `PLAYWRIGHT_CHANNEL=msedge` or `chrome` to use an installed browser. Tests use generated image fixtures by default. To review real game imagery, set `E2E_BEFORE_IMAGE` and `E2E_AFTER_IMAGE` to local PNG screenshot paths before running the browser suite.
+Browser tests start their own production server on **3018**, use an explicitly test-only password, and exercise login, pre-entry uploads, immediate public saves, date changes, screenshot access, live editing, comments and polls. They write ignored captures to `artifacts/visual` and failure traces to `test-results`. Set `PLAYWRIGHT_CHANNEL=msedge` or `chrome` to use an installed browser. Tests use generated image fixtures by default. To review real game imagery, set `E2E_BEFORE_IMAGE` and `E2E_AFTER_IMAGE` to local PNG screenshot paths before running the browser suite.
 
 The esbuild override keeps Drizzle's legacy development loader on a patched compiler; schema generation and tests verify the override. Reassess it when updating Drizzle. Do not expose a Drizzle studio or development server publicly.
 
@@ -133,7 +133,7 @@ The esbuild override keeps Drizzle's legacy development loader on a patched comp
 - `src/app`: server-rendered public pages, owner routes, server actions, upload/media/health handlers.
 - `src/components`: shared reader view, editor, and login form.
 - `src/lib/post.ts`: content types and input/YouTube validation.
-- `src/server`: authentication, PostgreSQL queries, image validation/storage, and transactional publication.
+- `src/server`: authentication, PostgreSQL queries, image validation/storage, and transactional saves.
 - `drizzle`: schema snapshots and ordered SQL migrations. Generate changes with `npm run db:generate` and review the SQL before deployment.
 - `tests`: unit, PostgreSQL/S3 integration, and browser acceptance tests.
 
@@ -141,7 +141,7 @@ The original scope and acceptance gates are in [IMPLEMENTATION_PLAN.md](IMPLEMEN
 
 ## Comments and design polls
 
-Each published entry has guest comments with nested replies. Visitors enter a display name; no account is required. The owner studio can hide and restore comments, preserving their replies. Hidden comment text and names are not sent to readers. Draft discussions are private. Comments are limited to 3,000 characters and ten submissions per 15 minutes per trusted client IP (shared limit when proxy trust is disabled).
+Each published entry has guest comments with nested replies. Visitors enter a display name; no account is required. The owner studio can hide and restore comments, preserving their replies. Hidden comment text and names are not sent to readers. Comments are limited to 3,000 characters and ten submissions per 15 minutes per trusted client IP (shared limit when proxy trust is disabled).
 
 The entry editor can create an optional poll with a question and 2–12 labeled choices, such as Proposal A and Proposal B matching gallery captions. Readers see live totals after each vote and can change their choice. An HTTP-only browser cookie identifies a voter; clearing cookies or using another browser permits another vote, so this is informal feedback, not verified one-person voting. No third-party account or tracking service is used. Poll questions and choices are fixed once votes exist; owners can close or reopen voting. Poll settings save separately from entry text, and polls on drafts remain private until publication.
 

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { prepareTestDatabase } from "../support/database";
 import { db, closeDb } from "../../src/server/db";
 import { hashPassword, digest } from "../../src/server/password";
@@ -19,18 +20,21 @@ import {
   cleanupStorage,
 } from "../../src/server/images";
 import * as storage from "../../src/server/storage";
-import type { PostInput } from "../../src/lib/post";
-import { publicationDay } from "../../src/lib/day";
-import { readFile } from "node:fs/promises";
-
 let token: string, png: Buffer;
 const password = "integration-test-only-password";
+const content = {
+  title: "A clearer galaxy",
+  paragraphOne: "The original view.",
+  paragraphTwo: "The improved view.",
+  images: [],
+  youtubeUrls: [],
+};
 beforeAll(async () => {
   await prepareTestDatabase("galaxy_wars_blog_test");
   process.env.ADMIN_PASSWORD_HASH = await hashPassword(password);
   token = await login(password, "initial-test");
   png = await sharp({
-    create: { width: 640, height: 360, channels: 3, background: "#345678" },
+    create: { width: 64, height: 64, channels: 3, background: "#345678" },
   })
     .png()
     .toBuffer();
@@ -43,183 +47,180 @@ afterAll(async () => {
   for (const key of keys) await storage.deleteObject(key.object_key);
   await closeDb();
 });
-async function completeInput(title = "A clearer galaxy") {
-  const id = await createPost(token);
-  const before = await uploadImage(token, id, "before", png, "image/png");
-  const after = await uploadImage(token, id, "after", png, "image/png");
-  const input: PostInput = {
-    id,
-    version: 0,
-    title,
-    paragraphOne: "The original view needed clarity.",
-    paragraphTwo: "The new view makes every choice clear.",
-    youtubeUrl: "",
-    beforeId: before.id,
-    afterId: after.id,
-    beforeAlt: "Original view",
-    afterAlt: "Improved view",
-    intent: "publish",
-  };
-  return { input, before, after };
-}
-it("protects all owner operations and private images", async () => {
-  await expect(createPost()).rejects.toThrow(/sign in/);
+it("requires authentication and valid content before creating any entry", async () => {
+  await expect(createPost(undefined, content)).rejects.toThrow(/sign in/);
   await expect(savePost(undefined, {})).rejects.toThrow(/sign in/);
-  await expect(
-    uploadImage(undefined, randomUUID(), "before", png, "image/png"),
-  ).rejects.toThrow(/sign in/);
-  await expect(ownerPost(randomUUID())).rejects.toThrow(/sign in/);
-  const { input, before } = await completeInput("Private test");
-  await savePost(token, { ...input, intent: "draft" });
-  expect((await publicDays()).days).toHaveLength(0);
-  expect(await readImage(before.id)).toBeNull();
-  const ownerImage = await readImage(before.id, token);
-  expect(ownerImage?.mime).toBe("image/png");
-  await ownerImage?.body?.cancel();
-});
-it("publishes, stages replacements privately, preserves slugs/dates, rejects stale writes and unpublishes", async () => {
-  const { input, before, after } = await completeInput();
-  let post = await savePost(token, input);
-  expect(post.slug).toBe("a-clearer-galaxy");
-  expect(await publicPost(post.slug!)).toMatchObject({
-    paragraphOne: input.paragraphOne,
-  });
-  const readable = await readImage(after.id);
-  expect(readable).not.toBeNull();
-  await readable?.body?.cancel();
-  const replacement = await uploadImage(
-    token,
-    input.id,
-    "after",
-    png,
-    "image/png",
+  await expect(uploadImage(undefined, png, "image/png")).rejects.toThrow(
+    /sign in/,
   );
-  expect(await readImage(replacement.id)).toBeNull();
-  expect(
-    (await publicPost(post.slug!))?.images.find((i) => i.role === "after")?.id,
-  ).toBe(after.id);
-  await expect(
-    savePost(token, { ...input, version: post.version, afterId: before.id }),
-  ).rejects.toThrow(/does not belong|only once/);
-  const originalDate = post.publishedAt;
-  const originalDay = post.publishedDay;
-  post = await savePost(token, {
-    ...input,
-    version: post.version,
-    title: "Renamed title",
-    afterId: replacement.id,
-  });
-  expect(post.slug).toBe("a-clearer-galaxy");
-  expect(post.publishedAt).toBe(originalDate);
-  expect(post.publishedDay).toBe(originalDay);
-  expect(await readImage(after.id)).toBeNull();
-  await expect(savePost(token, input)).rejects.toThrow(/another tab/);
-  post = await savePost(token, {
-    ...input,
-    version: post.version,
-    afterId: replacement.id,
-    intent: "unpublish",
-  });
-  expect(await publicPost(post.slug!)).toBeNull();
-  expect(await readImage(before.id)).toBeNull();
-  post = await savePost(token, {
-    ...input,
-    version: post.version,
-    afterId: replacement.id,
-  });
-  expect(post.publishedAt).toBe(originalDate);
+  await expect(createPost(token, { ...content, title: "" })).rejects.toThrow();
+  expect((await publicDays()).days).toHaveLength(0);
+  const image = await uploadImage(token, png, "image/png");
+  expect(await readImage(image.id)).toBeNull();
+  const privateImage = await readImage(image.id, token);
+  expect(privateImage).not.toBeNull();
+  await privateImage?.body?.cancel();
+  expect(await ownerPost(randomUUID(), token)).toBeNull();
 });
-it("handles title collisions and rejects foreign post images", async () => {
-  const a = await completeInput(),
-    b = await completeInput();
-  const results = await Promise.all([
-    savePost(token, a.input),
-    savePost(token, b.input),
+it("saves publicly in one transaction and keeps replacements private until saved", async () => {
+  const image = await uploadImage(token, png, "image/png");
+  const selection = { id: image.id, alt: "Original" };
+  let post = await createPost(token, {
+    ...content,
+    images: [selection],
+    publishedDay: "2024-02-29",
+  });
+  expect(await publicPost(post.slug!)).toMatchObject({ id: post.id });
+  const response = await readImage(image.id);
+  expect(response).not.toBeNull();
+  await response?.body?.cancel();
+  const next = await uploadImage(token, png, "image/png");
+  expect(await readImage(next.id)).toBeNull();
+  const changed = await savePost(token, {
+    ...content,
+    id: post.id,
+    version: post.version,
+    images: [{ id: next.id, alt: "Improved" }],
+    publishedDay: "2023-12-31",
+  });
+  expect(changed.slug).toBe(post.slug);
+  expect(changed.publishedAt).toBe(post.publishedAt);
+  expect(await publicDay("2024-02-29")).toBeNull();
+  expect((await publicDay("2023-12-31"))?.posts[0].id).toBe(post.id);
+  expect(await readImage(image.id)).toBeNull();
+  await expect(
+    savePost(token, { ...content, id: post.id, version: post.version }),
+  ).rejects.toThrow(/changed/);
+  post = await savePost(token, {
+    ...content,
+    id: post.id,
+    version: changed.version,
+    publishedDay: "",
+  });
+  expect(post.publishedDay).toBe("2023-12-31");
+  expect(post.images).toHaveLength(0);
+});
+it("claims uploads once, rejects cross-entry reuse, and rolls back failed claims", async () => {
+  const image = await uploadImage(token, png, "image/png");
+  const selected = { ...content, images: [{ id: image.id, alt: "Proposal" }] };
+  const results = await Promise.allSettled([
+    createPost(token, selected),
+    createPost(token, selected),
   ]);
-  expect(results[0].slug).not.toBe(results[1].slug);
-  await expect(
-    savePost(token, {
-      ...a.input,
-      version: results[0].version,
-      afterId: b.after.id,
-    }),
-  ).rejects.toThrow(/does not belong/);
-  const duplicates =
-    await db()`select post_id, role, count(*) from post_images where active group by post_id, role having count(*) > 1`;
-  expect(duplicates).toHaveLength(0);
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+  await expect(createPost(token, selected)).rejects.toThrow(/does not belong/);
+  const next = await uploadImage(token, png, "image/png");
+  await db()`alter table posts add constraint reject_save check (title <> 'reject-this-save')`;
+  try {
+    await expect(
+      createPost(token, {
+        ...content,
+        title: "reject-this-save",
+        images: [{ id: next.id, alt: "Next" }],
+      }),
+    ).rejects.toThrow();
+    expect(await readImage(next.id)).toBeNull();
+    expect(
+      (await db()`select post_id from post_images where id = ${next.id}`)[0]
+        .post_id,
+    ).toBeNull();
+  } finally {
+    await db()`alter table posts drop constraint reject_save`;
+  }
 });
-it("preserves old content on storage failure and retries cleanup without deleting active objects", async () => {
-  const { input } = await completeInput("Failure testing");
-  await savePost(token, input);
-  const put = vi
-    .spyOn(storage, "putObject")
-    .mockRejectedValueOnce(new Error("Injected upload failure"));
-  await expect(
-    uploadImage(token, input.id, "after", png, "image/png"),
-  ).rejects.toMatchObject({
-    operation: "storage.putObject",
-    cause: { message: "Injected upload failure" },
+it("serializes concurrent saves for a new browser entry ID without duplicates", async () => {
+  const input = { ...content, id: randomUUID(), version: 0 };
+  const results = await Promise.allSettled([
+    savePost(token, input, undefined, true),
+    savePost(token, input, undefined, true),
+  ]);
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(await db()`select id from posts where id = ${input.id}`).toHaveLength(
+    1,
+  );
+});
+it("cleanup retries failures and cannot delete attached images", async () => {
+  const image = await uploadImage(token, png, "image/png");
+  const post = await createPost(token, {
+    ...content,
+    images: [{ id: image.id, alt: "Active" }],
   });
-  put.mockRestore();
-  expect(
-    (await ownerPost(input.id, token))?.images.find((i) => i.role === "after")
-      ?.id,
-  ).toBe(input.afterId);
-  const staged = await uploadImage(token, input.id, "after", png, "image/png");
+  const staged = await uploadImage(token, png, "image/png");
   await db()`update storage_cleanup set not_before = now() - interval '1 hour'`;
   const remove = vi
     .spyOn(storage, "deleteObject")
-    .mockRejectedValueOnce(new Error("Injected delete failure"));
+    .mockRejectedValueOnce(new Error("Injected failure"));
   expect((await cleanupStorage()).failed).toBe(1);
   remove.mockRestore();
   await db()`update storage_cleanup set not_before = now() - interval '1 hour'`;
   expect((await cleanupStorage()).failed).toBe(0);
   expect(await readImage(staged.id, token)).toBeNull();
-  expect((await ownerPost(input.id, token))?.images).toHaveLength(2);
-  expect(await cleanupStorage()).toEqual({ deleted: 0, failed: 0 });
+  expect((await ownerPost(post.id, token))?.images).toHaveLength(1);
+  const put = vi
+    .spyOn(storage, "putObject")
+    .mockRejectedValueOnce(new Error("Injected failure"));
+  await expect(uploadImage(token, png, "image/png")).rejects.toMatchObject({
+    operation: "storage.putObject",
+  });
+  put.mockRestore();
 });
-it("rolls back database failures without replacing an active image", async () => {
-  const { input } = await completeInput("Transaction testing");
-  const saved = await savePost(token, input);
-  const replacement = await uploadImage(
-    token,
-    input.id,
-    "after",
-    png,
-    "image/png",
-  );
-  await db()`alter table posts add constraint test_reject_title check (title <> 'reject-this-save')`;
+it("cleanup and attachment races never leave a public missing object", async () => {
+  const image = await uploadImage(token, png, "image/png");
+  await db()`update storage_cleanup set not_before = now() - interval '1 hour' where object_key = (select object_key from post_images where id = ${image.id})`;
+  const [save] = await Promise.allSettled([
+    createPost(token, {
+      ...content,
+      images: [{ id: image.id, alt: "Concurrent" }],
+    }),
+    cleanupStorage(),
+  ]);
+  if (save.status === "fulfilled") {
+    const response = await readImage(image.id);
+    expect(response).not.toBeNull();
+    await response?.body?.cancel();
+  } else expect(await readImage(image.id)).toBeNull();
+});
+it("keeps daily entries newest first and preserves ordering when edited", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
   try {
-    await expect(
-      savePost(token, {
-        ...input,
-        version: saved.version,
-        afterId: replacement.id,
-        title: "reject-this-save",
-      }),
-    ).rejects.toThrow();
-    const current = await ownerPost(input.id, token);
-    expect(current?.version).toBe(saved.version);
-    expect(current?.images.find((i) => i.role === "after")?.id).toBe(
-      input.afterId,
-    );
-    expect(await readImage(replacement.id)).toBeNull();
+    vi.setSystemTime(new Date("2026-01-01T12:00:00Z"));
+    const a = await createPost(token, {
+      ...content,
+      title: "First",
+      publishedDay: "2020-01-01",
+    });
+    vi.setSystemTime(new Date("2026-01-01T13:00:00Z"));
+    const b = await createPost(token, {
+      ...content,
+      title: "Second",
+      publishedDay: "2020-01-01",
+    });
+    await savePost(token, {
+      ...content,
+      id: a.id,
+      version: a.version,
+      title: "First edited",
+    });
+    expect((await publicDay("2020-01-01"))?.posts.map((p) => p.id)).toEqual([
+      b.id,
+      a.id,
+    ]);
+    expect(
+      (await publicDays()).days.find((d) => d.day === "2020-01-01")?.titles,
+    ).toEqual(["Second", "First edited"]);
   } finally {
-    await db()`alter table posts drop constraint test_reject_title`;
+    vi.useRealTimers();
   }
 });
-it("retains posts, images, sessions and rate limits across database connection restarts", async () => {
-  const { input } = await completeInput("Restart test");
-  const saved = await savePost(token, input);
+it("retains content and authentication limits across restarts", async () => {
+  const post = await createPost(token, content);
   for (let i = 0; i < 5; i++)
     await expect(login("wrong", "limited-client")).rejects.toThrow(/Unable/);
   await closeDb();
   await expect(login(password, "limited-client")).rejects.toThrow(/Too many/);
   expect(await sessionValid(token)).toBe(true);
-  expect((await publicPost(saved.slug!))?.title).toBe("Restart test");
-  const image = await readImage(input.afterId);
-  expect(image).not.toBeNull();
-  await image?.body?.cancel();
+  expect((await publicPost(post.slug!))?.id).toBe(post.id);
 });
 it("rejects expired, tampered, logged-out and rotated-password sessions", async () => {
   const session = await login(password, "session-tests");
@@ -235,144 +236,53 @@ it("rejects expired, tampered, logged-out and rotated-password sessions", async 
   process.env.ADMIN_PASSWORD_HASH = prior;
 });
 
-it("groups by first publication day, keeps newest entries first and hides only the unpublished entry", async () => {
-  const first = await completeInput("Daily first"),
-    second = await completeInput("Daily second"),
-    next = await completeInput("Next day");
-  vi.useFakeTimers({ toFake: ["Date"] });
-  process.env.BLOG_TIME_ZONE = "America/Chicago";
-  try {
-    vi.setSystemTime(new Date("2025-09-10T12:00:00Z"));
-    let a = await savePost(token, first.input);
-    vi.setSystemTime(new Date("2025-09-11T04:59:59Z"));
-    const b = await savePost(token, second.input);
-    vi.setSystemTime(new Date("2025-09-11T05:00:00Z"));
-    const c = await savePost(token, next.input);
-    expect(a.publishedDay).toBe("2025-09-10");
-    expect(b.publishedDay).toBe(a.publishedDay);
-    expect(c.publishedDay).toBe("2025-09-11");
-    expect((await publicDay(a.publishedDay!))?.posts.map((p) => p.id)).toEqual([
-      b.id,
-      a.id,
-    ]);
-    expect(
-      (await publicDays()).days.find((day) => day.day === a.publishedDay),
-    ).toMatchObject({
-      count: 2,
-      titles: [b.title, a.title],
-      image: { id: b.images.find((image) => image.role === "after")!.id },
-    });
-    a = await savePost(token, {
-      ...first.input,
-      version: a.version,
-      intent: "unpublish",
-    });
-    expect((await publicDay(a.publishedDay!))?.posts.map((p) => p.id)).toEqual([
-      b.id,
-    ]);
-    expect(await readImage(first.before.id)).toBeNull();
-    process.env.BLOG_TIME_ZONE = "Asia/Tokyo";
-    a = await savePost(token, { ...first.input, version: a.version });
-    expect(a.publishedDay).toBe("2025-09-10");
-    expect((await publicDay(a.publishedDay!))?.posts.map((p) => p.id)).toEqual([
-      b.id,
-      a.id,
-    ]);
-    await savePost(token, {
-      ...next.input,
-      version: c.version,
-      intent: "unpublish",
-    });
-    expect(await publicDay("2025-09-11")).toBeNull();
-    expect(
-      (await publicDays()).days.some((day) => day.day === "2025-09-11"),
-    ).toBe(false);
-    expect(await publicDay("2025-02-30")).toBeNull();
-  } finally {
-    vi.useRealTimers();
-    delete process.env.BLOG_TIME_ZONE;
-  }
-});
-
-it("paginates whole days rather than splitting same-day entries", async () => {
-  const added: string[] = [];
-  for (let index = 1; index <= 14; index++) {
-    const entry = await completeInput(`Pagination ${index}`);
-    const post = await savePost(token, entry.input);
-    const day = `2030-01-${String(index).padStart(2, "0")}`;
-    await db()`update posts set published_day = ${day}, published_at = ${`${day}T12:00:00Z`} where id = ${post.id}`;
-    added.push(post.id);
-  }
-  const first = await publicDays(1),
-    second = await publicDays(2);
-  expect(first.days).toHaveLength(12);
-  expect(first.hasMore).toBe(true);
-  expect(first.days[0].day).toBe("2030-01-14");
-  expect(first.days.at(-1)?.day).toBe("2030-01-03");
-  expect(second.days[0].day).toBe("2030-01-02");
-  expect(
-    second.days.some((day) =>
-      first.days.some((previous) => previous.day === day.day),
-    ),
-  ).toBe(false);
-  const sql = db();
-  await sql`update posts set published = false where id in ${sql(added)}`;
-});
-
-it("backfills pre-existing published and unpublished entries without shifting their Chicago day", async () => {
-  const migration = await readFile(
-    "drizzle/0001_tearful_ser_duncan.sql",
-    "utf8",
-  );
-  await db().begin(async (tx) => {
-    // A temporary pre-migration posts table shadows only this transaction's real table.
-    await tx`create temporary table posts (id uuid, slug text, published boolean, published_at timestamptz,
-      constraint publication_metadata check (not published or (slug is not null and published_at is not null))) on commit drop`;
-    await tx`insert into posts values (${randomUUID()}, 'old-entry', true, '2026-09-11T04:59:59Z'),
-      (${randomUUID()}, 'unpublished-entry', false, '2026-09-11T05:00:00Z'),
-      (${randomUUID()}, null, false, null)`;
-    for (const statement of migration.split("--> statement-breakpoint"))
-      if (statement.trim()) await tx.unsafe(statement);
-    const rows =
-      await tx`select slug, published_day::text as day from posts order by published_at nulls last`;
-    expect(rows).toEqual([
-      { slug: "old-entry", day: "2026-09-10" },
-      { slug: "unpublished-entry", day: "2026-09-11" },
-      { slug: null, day: null },
-    ]);
-    expect(publicationDay(new Date("2026-09-11T04:59:59Z"))).toBe(rows[0].day);
-  });
-});
-
-it("backfills drafts and moves live entries between daily pages", async () => {
-  const { input } = await completeInput("Backfilled update");
-  const draft = await savePost(token, {
-    ...input,
-    intent: "draft",
-    publishedDay: "2024-02-29",
-  });
-  expect(draft.publishedDay).toBe("2024-02-29");
-  expect(draft.publishedAt).toBeNull();
-  const published = await savePost(token, { ...input, version: draft.version });
-  expect(published.publishedDay).toBe("2024-02-29");
-  expect(
-    (await publicDay("2024-02-29"))?.posts.some((p) => p.id === input.id),
-  ).toBe(true);
-  const moved = await savePost(token, {
-    ...input,
-    version: published.version,
-    publishedDay: "2023-12-31",
-  });
-  expect(moved.publishedAt).toBe(published.publishedAt);
-  expect(moved.slug).toBe(published.slug);
-  expect(await publicDay("2024-02-29")).toBeNull();
-  expect(
-    (await publicDay("2023-12-31"))?.posts.some((p) => p.id === input.id),
-  ).toBe(true);
-  const preserved = await savePost(token, {
-    ...input,
-    version: moved.version,
-    publishedDay: "",
-  });
-  expect(preserved.publishedDay).toBe("2023-12-31");
+it("migrates every old entry, including empty drafts, without changing content or existing links", async () => {
+  const migration = await readFile("drizzle/0005_wealthy_luckman.sql", "utf8");
+  const schema = "migration_" + randomUUID().replaceAll("-", "");
+  const rollback = new Error("rollback fixture");
+  await expect(
+    db().begin(async (tx) => {
+      await tx.unsafe(`create schema ${schema}`);
+      await tx.unsafe(`set local search_path to ${schema}, public`);
+      await tx`create table posts (id uuid primary key, slug text unique, title text, paragraph_one text, published boolean default false, published_at timestamptz, published_day date, created_at timestamptz default now(), version integer default 0, constraint publication_metadata check (not published or slug is not null))`;
+      await tx`create index published_days on posts(published_day,published_at) where published`;
+      await tx`create table post_images (id uuid primary key,post_id uuid not null references posts(id),active boolean)`;
+      const a = randomUUID(),
+        b = randomUUID(),
+        c = randomUUID();
+      await tx`insert into posts(id,slug,title,paragraph_one,published,published_at,published_day) values (${a},'existing-link','Live','Original',true,'2020-01-01','2020-01-01')`;
+      await tx`insert into posts(id,title,paragraph_one,created_at) values (${b},'','', '2024-03-01T01:00:00Z'), (${c},'Backfill','Saved text','2024-03-01T01:00:00Z')`;
+      await tx`update posts set published_day='2022-05-03' where id=${c}`;
+      const image = randomUUID();
+      await tx`insert into post_images values (${image},${b},true)`;
+      await tx`select set_config('blog.time_zone','America/Chicago',true)`;
+      for (const statement of migration.split("--> statement-breakpoint"))
+        await tx.unsafe(statement);
+      const rows = await tx`select *,published_day::text as day from posts`;
+      expect(rows).toHaveLength(3);
+      expect(rows.find((r) => r.id === a)).toMatchObject({
+        slug: "existing-link",
+        title: "Live",
+        day: "2020-01-01",
+      });
+      expect(rows.find((r) => r.id === b)).toMatchObject({
+        title: "",
+        paragraph_one: "",
+        day: "2024-02-29",
+        version: 1,
+      });
+      expect(rows.find((r) => r.id === c)).toMatchObject({
+        title: "Backfill",
+        paragraph_one: "Saved text",
+        day: "2022-05-03",
+      });
+      expect(
+        rows.every((r) => r.slug && r.published_at && !("published" in r)),
+      ).toBe(true);
+      expect(
+        (await tx`select * from post_images where id=${image}`)[0],
+      ).toMatchObject({ post_id: b, active: true });
+      throw rollback;
+    }),
+  ).rejects.toBe(rollback);
 });

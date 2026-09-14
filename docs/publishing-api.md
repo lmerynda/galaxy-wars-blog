@@ -1,85 +1,73 @@
-# AI publishing API
+# Entry API
 
-The API prepares drafts for review and publishes only through a separate explicit request. It uses the same validation, private image storage and daily grouping as the owner editor. Published entries can only be edited or unpublished in the owner editor.
+Every successful save is immediately public. POST creates an entry and PUT corrects an existing entry. There is no draft, preview, publish or unpublish workflow.
 
-## Enable access
+## Access and discovery
 
-Generate a token locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Store it as `BLOG_API_TOKEN` in the Railway **application service**, redeploy, and put the same value in the publishing agent's secret store. Do not put it in prompts, URLs, Git, or client-side code. Empty/unset disables API access. Replace the token and redeploy to revoke existing access. The API token does not grant a browser login.
+Set BLOG_API_TOKEN on the application service and in the client's secret store. Use a random token of at least 32 characters, for example the hex output of 32 random bytes. Empty/unset disables access. Token rotation requires restarting the application; the API token does not grant browser login. Never place it in a URL or commit it.
 
-Migration `0002` creates persistent retry receipts. Railway's pre-deploy command must be `npm run db:migrate` before deploying this version.
+All endpoints require Authorization: Bearer <token>. Cookies and Origin are not required for API requests. GET /api/v1/help returns executable request schemas, examples, capabilities and limits. Fetch help before preparing requests. No idempotency key is required for GET.
 
-All requests use `Authorization: Bearer <token>`. No cookies or Origin header are required. Responses are JSON with `Cache-Control: no-store`. URLs in responses are relative to the blog origin. Draft preview links open the existing editor and require the owner's normal password login; there is no public preview token.
+Client configuration (values are examples; keep the real token private):
 
-## Discover capabilities
-
-`GET /api/v1/help` returns JSON with endpoint descriptions, current request JSON Schemas, date handling, image/video capabilities, limits, retry rules, response fields, and copyable request examples. It requires the same bearer token as publishing; no idempotency key is needed. It does not access the database. Clients should fetch it before preparing content so they discover newly supported fields.
-
-```sh
-curl --fail-with-body "$BLOG_URL/api/v1/help" -H "Authorization: Bearer $BLOG_API_TOKEN"
+```dotenv
+BLOG_URL=https://your-blog.up.railway.app
+BLOG_POST_URL=https://your-blog.up.railway.app/api/v1/posts
+BLOG_HELP_URL=https://your-blog.up.railway.app/api/v1/help
+BLOG_API_TOKEN=your-secret-token
 ```
 
-## Workflow
+```sh
+curl --fail-with-body "$BLOG_HELP_URL" -H "Authorization: Bearer $BLOG_API_TOKEN"
+```
 
-1. `POST /api/v1/posts` creates a draft with the JSON fields below. Use empty image IDs initially.
-2. `POST /api/v1/posts/{id}/images/before` and `/images/after` upload raw PNG, JPEG or WebP bytes, with the matching `Content-Type` (`image/png`, `image/jpeg`, `image/webp`). Each returns `{ "image": { "id": "…", ... } }`. Images remain staged and private until selected in a saved draft. Limits: 10 MiB, 32 megapixels, still images only. Save selections within 24 hours; abandoned uploads are eligible for existing storage cleanup.
-3. `PUT /api/v1/posts/{id}` saves the complete JSON content below, including the latest `version` and uploaded image IDs. This is a full replacement, not a partial patch. It cannot publish or change a published entry.
-4. Share `previewUrl` with the owner for review. The editor includes its usual preview.
-5. After explicit publishing approval, `GET /api/v1/posts/{id}` retrieves the current post and version. Confirm the content is still the approved version; if it changed, seek a fresh review.
-6. `POST /api/v1/posts/{id}/publish` with `{ "version": 2 }` publishes the saved content and returns `publicUrl`. Both paragraphs and descriptions for all selected images must be present. The saved publishedDay determines the daily page, defaulting to the first publication day.
+## Save an entry
 
-Create JSON (title and both paragraphs are required; draft values can be empty):
+1. Optionally upload each image to POST /api/v1/images, using raw PNG/JPEG/WebP bytes with its matching Content-Type. This works before an entry exists. Each response is {image: {id, role, url, width, height, alt}}. The image remains private until selected in a successful save.
+2. POST /api/v1/posts with complete content and the ordered uploaded IDs. It returns the public entry immediately.
+3. To correct an entry, GET /api/v1/posts/{id}, then PUT the complete content plus its current version to the same URL. Use the latest content to avoid overwriting another client's changes.
 
 ```json
 {
   "title": "Clearer targeting",
-  "paragraphOne": "Previously, selecting a nearby ship was difficult.",
-  "paragraphTwo": "The updated targeting makes the intended ship easier to select.",
-  "youtubeUrls": ["https://youtu.be/VIDEO_ID_HERE"],
-  "beforeId": "",
-  "afterId": "",
-  "beforeAlt": "Targeting before the change",
-  "afterAlt": "Targeting after the change"
+  "paragraphOne": "Previously, selecting nearby ships was difficult.",
+  "paragraphTwo": "Updated targeting makes the intended ship easier to select.",
+  "publishedDay": "2024-02-29",
+  "images": [],
+  "youtubeUrls": []
 }
 ```
 
-For PUT, add `"version": <current post.version>`. Titles allow 120 characters, each paragraph 1,500, alt text 200, and each HTTPS YouTube URL 2,048. `youtubeUrls` is an ordered array with no video-count limit; send `[]` to remove all videos. The overall API request-size limit still applies. Unknown fields are rejected. Send `youtubeUrls`, not the returned `videoIds`. Legacy `youtubeUrl` is still accepted when `youtubeUrls` is omitted; the array takes precedence. Responses retain `videoId` as the first video for older clients. Videos render as embedded players.
+For images send images: [{"id":"uploaded UUID","alt":"Description"}, ...]. For videos send youtubeUrls: ["https://youtu.be/VIDEO_ID_HERE", ...]. Each video is embedded. Video files are uploaded to YouTube separately; playlist URLs are not supported.
 
-Create, save, read and publish return:
+PUT adds version (a nonnegative integer from GET). It is a full replacement, not a partial patch. Send the full image/video selections to retain them; omitted selections are empty. Empty arrays explicitly remove all selections. Unknown fields, including intent, are rejected. Existing beforeId/afterId and beforeAlt/afterAlt fields can still select older role-tagged images when images is omitted; prefer images. youtubeUrl is accepted only as a fallback when youtubeUrls is omitted.
 
-```json
-{
-  "post": { "id": "…", "version": 1, "published": false, "images": [] },
-  "previewUrl": "/admin/posts/…/edit",
-  "publicUrl": null
-}
-```
+Optional publishedDay is a real YYYY-MM-DD date in years 0001–9999. On creation it defaults to the first-save day in BLOG_TIME_ZONE. On edit, omission or an empty string preserves the saved day. It supports backfilling and moving records between daily pages. Future dates are public immediately. Changing content or dates preserves the original publishedAt timestamp and slug; publishedAt now describes first public save, not a separate publication action.
 
-The actual `post` also contains content and publication metadata. All successful requests return HTTP 200.
+Success returns HTTP 200 and {post, editUrl, publicUrl}; URLs are relative to the blog origin. The owner edit URL requires normal browser login. Post includes id, slug, title, paragraphOne, paragraphTwo, publishedDay, publishedAt, version, images, videoIds and the first-video alias videoId. There is no published flag or previewUrl.
 
-## Safe retries
+## Validation and uploads
 
-Every mutation requires an `Idempotency-Key`: a fresh UUID is recommended (16–128 letters, digits, underscores or hyphens). Keep the same key, method, path, content type and exact body bytes when retrying that request. The successful response is stored durably with the write and replayed on retries, including after restarts. Keys are global to this blog and survive token rotation. Reusing a key for different content returns 409. Receipts are retained indefinitely; they contain content snapshots but no API tokens.
+Title and both paragraphs must be nonempty. Limits: title 120 characters, each paragraph 1,500, each image description 200, each YouTube URL 2,048. Every selected image needs a description. Image/video counts have no explicit limit; JSON requests are limited to 256 KiB. Zero images and zero videos are valid.
 
-A replay returns the original response, which can have an older version. GET the post for its current state. Never reuse a key for a new edit or upload. A retry of an abandoned, expired upload can return its original image ID; use a fresh key and upload again if it has been cleaned up.
-
-Failed writes do not record a success receipt. After a timeout or 503, retry unchanged with the same key. After a 409 version conflict, GET and review current content before issuing a new request with a new key. This prevents duplicate posts and protects edits made through the browser.
-
-Errors have `{ "error": "message" }`: 400 invalid content/key, 401 invalid/disabled token, 404 missing endpoint/post, 409 conflict, 413 too large, 415 wrong JSON content type, 503 temporary failure. Every response includes `X-Request-ID`; unexpected 503 responses also include `requestId` in their JSON. Search Railway's **Deploy Logs** for that ID to find the structured `api.request.failed` event. It includes the operation (such as `storage.putObject`), safe error codes, provider status/request ID, and missing storage variable names. Raw error messages, SQL, headers and draft content are omitted. Railway's HTTP access log alone only shows the request status and duration. No API token is accepted in a query string, cookie or preview URL.
-
-Example upload (POSIX shell; token loaded from your secret store):
+Images must be still PNG, JPEG or WebP, at most 10 MiB and 32 megapixels. Selected IDs must be unique and either unattached or already owned by the entry. An image cannot be shared across entries. Uploads are eligible for cleanup after 24 hours until attached; save promptly. Removing an image makes it private immediately and queues delayed cleanup. Replacements remain private until saved, and failed saves preserve the existing public entry.
 
 ```sh
-curl --fail-with-body "$BLOG_URL/api/v1/posts/$POST_ID/images/before" \
+curl --fail-with-body "$BLOG_URL/api/v1/images" \
   -H "Authorization: Bearer $BLOG_API_TOKEN" \
   -H "Idempotency-Key: $UPLOAD_REQUEST_ID" \
   -H "Content-Type: image/png" \
-  --data-binary @before.png
+  --data-binary @screenshot.png
 ```
 
-## Flexible image galleries
+## Retries and errors
 
-For new clients, upload each image to `POST /api/v1/posts/{id}/images/gallery`, then send `images: [{"id":"uploaded UUID","alt":"Proposal A"}, ...]` in the create/PUT body. The array is the full gallery in display order; omit an image to remove it on save. There is no image-count limit, and `images: []` supports text-only updates. Each image retains the 10 MiB/32-megapixel limit, and JSON requests are limited to 256 KiB. Selected images must belong to this entry and have unique IDs.
+Every mutation needs a unique Idempotency-Key: 16–128 letters, digits, underscores or hyphens; UUID recommended. Retry the same operation using the same key, method, path, Content-Type and exact body bytes. A receipt commits atomically with the save. Same-key retries replay the original response; a changed request returns 409. GET current state after replay because its version may be older. Keys persist across restarts and token rotation. After a version conflict, GET current content before sending a new operation with a new key.
 
-The old `/images/before` and `/images/after` endpoints and `beforeId`/`afterId` fields remain supported. When `images` is present it takes precedence, and the four legacy image fields may be omitted. PUT without `images` uses the legacy pair, so gallery clients should always send the full array. Publishing uses all saved images. Poll creation and moderation are available in the owner editor; the publishing API does not manage guest identities or votes.
+Responses use Cache-Control: no-store and X-Request-ID. Errors return {error}: 400 invalid fields/key, 401 invalid/disabled token, 404 missing post/endpoint, 409 version/key conflict, 413 oversized body, 415 wrong JSON content type, 503 temporary failure. Unexpected failures include requestId in JSON and emit a structured api.request.failed event in deployment logs without secrets or entry content. Retry a timeout/503 unchanged with the same key.
 
-Optional `publishedDay` (`YYYY-MM-DD`) sets the entry’s calendar date on create or draft PUT. It survives publication and controls daily grouping. Omit it or send an empty string to preserve the saved date; a new entry without a date uses the blog timezone on publication. Use the owner editor to change dates of live entries. This does not schedule publication.
+## Upgrade and removed endpoints
+
+This intentionally changes the existing v1 API. POST and PUT are immediately public; /posts/{id}/publish and /posts/{id}/images/{role} are removed. Upload through /api/v1/images. Mutation fingerprints changed so pre-upgrade receipt keys conflict instead of replaying obsolete draft responses. Read migrated entries again because the migration increments their versions, and use fresh operation keys. There is no legacy publication layer or v2 API.
+
+Migration 0005 exposes every existing record with its saved content before removing publication state. It does not invent missing descriptions. All subsequent saves must meet current validation. Poll creation/editing and comment moderation stay in the owner editor, available after an entry's first save. The API does not list/delete entries or manage comments, votes or guest identities.
