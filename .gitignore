@@ -8,3 +8,4 @@ playwright-report/
 test-results/
 artifacts/
 .npm-cache/
+.codex-remote-attachments/
