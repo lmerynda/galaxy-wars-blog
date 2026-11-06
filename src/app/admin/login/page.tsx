@@ -8,14 +8,13 @@ export default async function Login({
   searchParams: Promise<{ next?: string }>;
 }) {
   return (
-    <section className="login-panel panel">
-      <span className="brand-icon">✳</span>
-      <p className="eyebrow">Behind the scenes</p>
-      <h1>Owner studio.</h1>
-      <p className="lede">A quiet space to document the next change.</p>
+    <section className="hud-panel login-panel">
+      <p className="panel-title">Owner studio</p>
+      <h1>Sign in</h1>
+      <p className="lede">Write, edit and moderate development updates.</p>
       <LoginForm next={safeAdminPath((await searchParams).next ?? "")} />
       <Link href="/" className="back-link">
-        ← Back to the public log
+        Back to the public log
       </Link>
     </section>
   );

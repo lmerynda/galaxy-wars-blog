@@ -155,18 +155,14 @@ export function Editor({ initial }: { initial: Post }) {
   return (
     <>
       <a className="back-link" href="/admin">
-        ← Your updates
+        Your updates
       </a>
-      <div className="admin-heading editor-heading">
-        <div>
-          <p className="eyebrow">
-            Owner studio / {saved.version ? "Edit entry" : "New entry"}
-          </p>
-          <h1>
-            {saved.title ? "Refine the story." : "Write the next chapter."}
-          </h1>
-        </div>
-      </div>
+      <header className="hud-panel page-header">
+        <p className="panel-title">
+          {saved.version ? "Edit entry" : "New entry"}
+        </p>
+        <h1>{saved.title || "Untitled entry"}</h1>
+      </header>
       <p
         ref={errorRef}
         tabIndex={-1}
@@ -183,13 +179,8 @@ export function Editor({ initial }: { initial: Post }) {
           }}
         >
           <fieldset disabled={busy} className="editor-fields">
-            <section className="panel editor-panel">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">01 / The story</p>
-                  <h2>Two paragraphs. One change.</h2>
-                </div>
-              </div>
+            <section className="hud-panel editor-panel">
+              <h2 className="panel-title">Story</h2>
               <label htmlFor="publishedDay">Entry date</label>
               <input
                 id="publishedDay"
@@ -255,16 +246,11 @@ export function Editor({ initial }: { initial: Post }) {
                 </div>
               </div>
             </section>
-            <section className="panel editor-panel">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">02 / The evidence</p>
-                  <h2>Show the difference.</h2>
-                </div>
-                <span className="muted upload-hint">
-                  PNG, JPEG or WebP · up to 10 MiB each
-                </span>
-              </div>
+            <section className="hud-panel editor-panel">
+              <h2 className="panel-title">Images</h2>
+              <p className="muted upload-hint">
+                PNG, JPEG or WebP, up to 10 MiB each.
+              </p>
               <label htmlFor="galleryFiles">Add images</label>
               <input
                 id="galleryFiles"
@@ -355,12 +341,12 @@ export function Editor({ initial }: { initial: Post }) {
                 })}
               </div>
             </section>
-            <section className="panel editor-panel video-field">
+            <section className="hud-panel editor-panel video-field">
               <div>
-                <p className="eyebrow">03 / In motion · optional</p>
-                <h2>A little more to show?</h2>
+                <h2 className="panel-title">Videos</h2>
                 <p className="muted">
-                  Add a link if a video tells the story better.
+                  Optional. Add YouTube links when a video shows the change
+                  better.
                 </p>
               </div>
               <div>
@@ -426,7 +412,7 @@ export function Editor({ initial }: { initial: Post }) {
         </form>
       </div>
       {saved.version > 0 && <Discussion postId={saved.id} admin />}
-      <div className="save-bar">
+      <div className="hud-panel save-bar">
         <div aria-live="polite">
           <strong>
             {saving
@@ -445,7 +431,7 @@ export function Editor({ initial }: { initial: Post }) {
           </p>
           {saved.version > 0 && (
             <a href={postUrl(saved)} target="_blank" rel="noreferrer">
-              View public page ↗
+              View public page
             </a>
           )}
         </div>
@@ -455,7 +441,7 @@ export function Editor({ initial }: { initial: Post }) {
             disabled={busy}
             onClick={() => void submit()}
           >
-            {saved.version ? "Save changes →" : "Save entry →"}
+            {saved.version ? "Save changes" : "Save entry"}
           </button>
         </div>
       </div>

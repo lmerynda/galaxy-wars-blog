@@ -90,7 +90,7 @@ export function Discussion({
   }
   return (
     <section
-      className="discussion panel"
+      className="discussion hud-panel"
       aria-label={
         admin ? "Poll and comment management" : "Discussion and voting"
       }
@@ -157,7 +157,7 @@ export function Discussion({
       )}
       {poll && (
         <div className="poll">
-          <p className="eyebrow">
+          <p className="panel-title">
             {poll.closed ? "Poll closed" : "Community vote"}
           </p>
           <h3>{poll.question}</h3>

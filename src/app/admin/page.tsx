@@ -8,28 +8,27 @@ export default async function Admin() {
   const posts = await ownerPosts(await ownerPage());
   return (
     <>
-      <div className="admin-heading">
+      <header className="hud-panel page-header admin-heading">
         <div>
-          <p className="eyebrow">Owner studio</p>
-          <h1>Your field notes.</h1>
-          <p className="lede">Small stories from a galaxy in progress.</p>
+          <p className="panel-title">Owner studio</p>
+          <h1>Your updates</h1>
         </div>
         <div className="actions">
           <form action={signOut}>
             <button className="button">Sign out</button>
           </form>
           <Link className="button button-primary" href="/admin/new">
-            ＋ New update
+            New update
           </Link>
         </div>
-      </div>
-      <div className="admin-list panel">
-        <div className="section-heading">
-          <h2>All updates</h2>
-          <span className="muted">
-            {posts.length} {posts.length === 1 ? "post" : "posts"}
+      </header>
+      <div className="hud-panel admin-list">
+        <h2 className="panel-title admin-list-title">
+          All updates
+          <span className="ready">
+            {posts.length} {posts.length === 1 ? "entry" : "entries"}
           </span>
-        </div>
+        </h2>
         {posts.length ? (
           posts.map((post) => (
             <Link
@@ -41,18 +40,18 @@ export default async function Admin() {
                 <h3>{post.title || "Untitled update"}</h3>
                 <p className="muted">{formatDate(post.publishedDay)}</p>
               </div>
-              <span className="muted">Edit →</span>
+              <span className="muted">Edit</span>
             </Link>
           ))
         ) : (
           <div className="admin-empty">
-            <h3>Your next change starts here.</h3>
+            <h3>No updates yet</h3>
             <p className="muted">
-              Add two paragraphs and any images or videos. Save to share your
+              Add two paragraphs and any images or videos. Saving publishes the
               update.
             </p>
             <Link className="button" href="/admin/new">
-              Write the first update →
+              Write the first update
             </Link>
           </div>
         )}

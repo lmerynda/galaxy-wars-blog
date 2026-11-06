@@ -18,23 +18,21 @@ export default async function Comments({
   });
   return (
     <>
-      <div className="admin-heading">
-        <div>
-          <p className="eyebrow">Across the galaxy</p>
-          <h1>Latest comments.</h1>
-          <p className="lede">
-            Comments and replies from every update, newest first.
-          </p>
-        </div>
-      </div>
+      <header className="hud-panel page-header">
+        <p className="panel-title">Comms</p>
+        <h1>Latest comments</h1>
+        <p className="lede">
+          Comments and replies from every update, newest first.
+        </p>
+      </header>
       <div className="recent-comments">
         {comments.length ? (
           comments.map((c) => (
-            <article className="panel recent-comment" key={c.id}>
+            <article className="hud-panel recent-comment" key={c.id}>
               <div className="recent-comment-meta">
                 <strong>{c.name}</strong>
                 <span className="muted">
-                  {c.reply ? "Reply · " : ""}
+                  {c.reply ? "Reply, " : ""}
                   <time dateTime={c.createdAt}>
                     {date.format(new Date(c.createdAt))}
                   </time>
@@ -45,12 +43,12 @@ export default async function Comments({
                 className="entry-permalink"
                 href={`/days/${c.day}#entry-${c.postId}`}
               >
-                {c.title || "Untitled update"} · View discussion ↗
+                {c.title || "Untitled update"}
               </Link>
             </article>
           ))
         ) : (
-          <p className="panel recent-comment">
+          <p className="hud-panel recent-comment">
             {page === 1 ? "No comments yet." : "No more comments."}
           </p>
         )}
@@ -58,12 +56,12 @@ export default async function Comments({
       <nav className="pagination" aria-label="Comments pages">
         {page > 1 && (
           <Link className="button" href={`/comments?page=${page - 1}`}>
-            ← Newer comments
+            Newer comments
           </Link>
         )}
         {hasMore && (
           <Link className="button" href={`/comments?page=${page + 1}`}>
-            Older comments →
+            Older comments
           </Link>
         )}
       </nav>

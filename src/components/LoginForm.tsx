@@ -20,7 +20,7 @@ export function LoginForm({ next }: { next: string }) {
         {state.error}
       </p>
       <button className="button button-primary" disabled={pending}>
-        {pending ? "Signing in…" : "Enter the studio →"}
+        {pending ? "Signing in…" : "Enter the studio"}
       </button>
     </form>
   );

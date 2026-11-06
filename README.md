@@ -2,7 +2,7 @@
 
 A public blog for small, visual updates to Galaxy Wars, grouped into one page per day. Every entry has two paragraphs, an ordered image gallery, and optional embedded YouTube videos. A password-protected owner studio lives at `/admin`.
 
-The application follows the charcoal/lime styling and single Next.js/PostgreSQL/Railway bucket setup of the sibling Trading Journal project. It starts empty; test posts are never inserted into the development or production database.
+The interface borrows the Galaxy Wars flight HUD: cut-corner cyan glass panels over the game's frontier nebula (see [docs/design.md](docs/design.md)). It uses the single Next.js/PostgreSQL/Railway bucket setup of the sibling Trading Journal project. It starts empty; test posts are never inserted into the development or production database.
 
 ## Local setup
 

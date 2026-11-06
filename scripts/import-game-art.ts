@@ -10,23 +10,9 @@ if (!game) throw new Error("Pass the galaxy-wars repository path.");
 const art = path.join(game, "client/Assets/Art/Resources");
 const out = "public/game";
 const backgrounds: [string, string, number][] = [
-  ["Backgrounds/Sectors/mining-field.png", "sector-mining", 1672],
   ["Backgrounds/Sectors/pve-frontier.png", "sector-frontier", 1672],
-  ["Backgrounds/Sectors/pvp-redspace.png", "sector-redspace", 1672],
-  ["Backgrounds/Sectors/strong-pve-storm.png", "sector-storm", 1672],
-  ["Backgrounds/HangarLoadout.png", "hangar-bay", 1672],
-  ["Backgrounds/carina_cosmic_cliffs.png", "carina", 3000],
 ];
-const schematics = [
-  "Dart",
-  "Lancer",
-  "Tempest",
-  "Sentinel",
-  "Bulwark",
-  "Bastion",
-  "Cargo",
-  "Mining",
-];
+const schematics = ["Dart"];
 await mkdir(out, { recursive: true });
 for (const [source, name, width] of backgrounds) {
   for (const [suffix, w] of [

@@ -51,11 +51,11 @@ test("save creates a public entry directly and live edits preserve images and da
   ).toBe(400);
   const reader = await guest.newPage();
   await reader.goto("/");
-  await expect(reader.locator(".post-card")).toHaveCount(0);
+  await expect(reader.locator(".mission")).toHaveCount(0);
   await page.getByRole("button", { name: "Save entry" }).click();
   await expect(page.locator(".form-error")).not.toBeEmpty();
   await reader.reload();
-  await expect(reader.locator(".post-card")).toHaveCount(0);
+  await expect(reader.locator(".mission")).toHaveCount(0);
   await fillEntry(page, "Ammunition gets a physical identity");
   await page.getByLabel("Entry date", { exact: true }).fill("2024-02-29");
   const png = await sharp({
@@ -296,7 +296,7 @@ test("gallery, threaded comments and design votes work for guests and owners", a
     .getByRole("link", { name: "1 total comment", exact: true })
     .click();
   await expect(
-    reader.getByRole("heading", { name: "Latest comments." }),
+    reader.getByRole("heading", { name: "Latest comments" }),
   ).toBeVisible();
   await expect(reader.locator(".recent-comment")).toHaveCount(1);
   await expect(reader.locator(".recent-comment")).toContainText(

@@ -4,9 +4,6 @@ import { notFound } from "next/navigation";
 import { publicDay } from "@/server/posts";
 import { dayUrl, formatDay, entryAnchor } from "@/lib/day";
 import { PostView } from "@/components/PostView";
-import { currentConcept } from "@/server/concept";
-import { ConceptDayHeader } from "@/concepts/views";
-import { sectorFor } from "@/lib/concepts";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ day: string }> };
@@ -47,46 +44,39 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function DayPage({ params }: Props) {
   const day = await publicDay((await params).day);
   if (!day) notFound();
-  const concept = await currentConcept();
+  const count = day.posts.length;
   return (
-    <div className="day-page" data-sector={sectorFor(day.day).id}>
+    <>
       <Link href="/" className="back-link">
-        ← All days
+        All days
       </Link>
-      {concept !== "current" ? (
-        <ConceptDayHeader concept={concept} day={day.day} posts={day.posts} />
-      ) : (
-        <header className="day-header">
-          <p className="eyebrow">Daily field notes</p>
-          <h1>
-            <time dateTime={day.day}>{formatDay(day.day)}</time>
-          </h1>
-          <p className="lede">
-            {day.posts.length} {day.posts.length === 1 ? "update" : "updates"}{" "}
-            from a galaxy in progress.
-          </p>
-          {day.posts.length > 1 && (
-            <nav className="day-contents" aria-label="This day’s updates">
-              {day.posts.map((post, index) => (
-                <a href={`#${entryAnchor(post)}`} key={post.id}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  {post.title}
-                  <span aria-hidden="true">↘</span>
-                </a>
-              ))}
-            </nav>
-          )}
-        </header>
-      )}
+      <header className="hud-panel day-header">
+        <p className="panel-title">Flight log entry</p>
+        <h1>
+          <time dateTime={day.day}>{formatDay(day.day)}</time>
+        </h1>
+        <p className="lede">
+          {count} {count === 1 ? "update" : "updates"} from this day.
+        </p>
+        {count > 1 && (
+          <nav className="day-contents" aria-label="This day’s updates">
+            {day.posts.map((post, index) => (
+              <a href={`#${entryAnchor(post)}`} key={post.id}>
+                <span>{index + 1}</span>
+                {post.title}
+              </a>
+            ))}
+          </nav>
+        )}
+      </header>
       <div className="day-entries">
         {day.posts.map((post, index) => (
           <PostView key={post.id} post={post} entryNumber={index + 1} />
         ))}
       </div>
-      <div className="post-end">
-        <span className="star-mark">✳</span>
-        <span>One day. A better galaxy.</span>
-      </div>
-    </div>
+      <Link href="/" className="button log-end">
+        Back to all days
+      </Link>
+    </>
   );
 }
