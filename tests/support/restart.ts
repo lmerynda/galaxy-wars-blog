@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { expect } from "@playwright/test";
 
+const port = String(Number(process.env.E2E_PORT ?? "3018") + 10);
+const origin = `http://localhost:${port}`;
 export async function verifyProcessRestart(
   postPath: string,
   imagePath: string,
@@ -21,7 +23,7 @@ export async function verifyProcessRestart(
         "node_modules/next/dist/bin/next",
         "start",
         "--port",
-        "3028",
+        port,
         "--hostname",
         "127.0.0.1",
       ],
@@ -29,7 +31,7 @@ export async function verifyProcessRestart(
         env: {
           ...process.env,
           DATABASE_URL: source.toString(),
-          APP_URL: "http://localhost:3028",
+          APP_URL: origin,
         },
         stdio: "ignore",
       },
@@ -40,7 +42,7 @@ export async function verifyProcessRestart(
         .poll(
           async () => {
             try {
-              return (await fetch("http://localhost:3028/api/health")).status;
+              return (await fetch(`${origin}/api/health`)).status;
             } catch {
               return 0;
             }
@@ -48,12 +50,12 @@ export async function verifyProcessRestart(
           { timeout: 15000 },
         )
         .toBe(200);
-      const post = await fetch(`http://localhost:3028${postPath}`);
+      const post = await fetch(`${origin}${postPath}`);
       expect(post.status).toBe(200);
       expect(await post.text()).toContain(
         "Ammunition gets a physical identity",
       );
-      const image = await fetch(`http://localhost:3028${imagePath}`);
+      const image = await fetch(`${origin}${imagePath}`);
       expect(image.status).toBe(200);
       expect((await image.arrayBuffer()).byteLength).toBeGreaterThan(0);
     } finally {

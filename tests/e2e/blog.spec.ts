@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { mkdir, readFile } from "node:fs/promises";
 import sharp from "sharp";
 import { verifyProcessRestart } from "../support/restart";
+const origin = `http://localhost:${process.env.E2E_PORT}`;
 async function login(page: Page) {
   await page.goto("/admin/login");
   await page.getByLabel("Owner password").fill("local-e2e-password-only");
@@ -33,11 +34,11 @@ test("save creates a public entry directly and live edits preserve images and da
       name: /Publish|Unpublish|Save draft|Preview update/,
     }),
   ).toHaveCount(0);
-  const guest = await browser.newContext({ baseURL: "http://localhost:3018" });
+  const guest = await browser.newContext({ baseURL: origin });
   expect(
     (
       await guest.request.post("/api/images", {
-        headers: { origin: "http://localhost:3018" },
+        headers: { origin },
       })
     ).status(),
   ).toBe(401);

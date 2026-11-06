@@ -8,7 +8,7 @@ const child = spawn(
     "node_modules/next/dist/bin/next",
     "start",
     "--port",
-    "3018",
+    process.env.E2E_PORT ?? "3018",
     "--hostname",
     "127.0.0.1",
   ],

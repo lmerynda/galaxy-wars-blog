@@ -124,7 +124,7 @@ npm audit
 
 Integration and browser tests require `npm run services`. They create separate `galaxy_wars_blog_test` and `galaxy_wars_blog_e2e` databases on the dedicated local PostgreSQL port; test setup refuses other hosts/ports and resets only those named test databases. Never point tests at a production service.
 
-Browser tests start their own production server on **3018**, use an explicitly test-only password, and exercise login, pre-entry uploads, immediate public saves, date changes, screenshot access, live editing, comments and polls. They write ignored captures to `artifacts/visual` and failure traces to `test-results`. Set `PLAYWRIGHT_CHANNEL=msedge` or `chrome` to use an installed browser. Tests use generated image fixtures by default. To review real game imagery, set `E2E_BEFORE_IMAGE` and `E2E_AFTER_IMAGE` to local PNG screenshot paths before running the browser suite.
+Browser tests start their own production server on **3018** (set `E2E_PORT` if Windows has reserved it), use an explicitly test-only password, and exercise login, pre-entry uploads, immediate public saves, date changes, screenshot access, live editing, comments and polls. They write ignored captures to `artifacts/visual` and failure traces to `test-results`. Set `PLAYWRIGHT_CHANNEL=msedge` or `chrome` to use an installed browser. Tests use generated image fixtures by default. To review real game imagery, set `E2E_BEFORE_IMAGE` and `E2E_AFTER_IMAGE` to local PNG screenshot paths before running the browser suite.
 
 The esbuild override keeps Drizzle's legacy development loader on a patched compiler; schema generation and tests verify the override. Reassess it when updating Drizzle. Do not expose a Drizzle studio or development server publicly.
 
