@@ -1,10 +1,5 @@
-import { db } from "@/server/db";
+import { healthResponse } from "@/server/health";
 export const dynamic = "force-dynamic";
-export async function GET() {
-  try {
-    await db()`select id from posts limit 1`;
-    return Response.json({ status: "ok" });
-  } catch {
-    return Response.json({ status: "unavailable" }, { status: 503 });
-  }
+export function GET() {
+  return healthResponse();
 }

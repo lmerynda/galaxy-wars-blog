@@ -88,7 +88,7 @@ Password hashes and all storage credentials stay server-side. Session cookies ar
 
 After deployment:
 
-1. Confirm `/api/health` returns `{"status":"ok"}`.
+1. Confirm `/api/health` returns `{"status":"ok"}`. It checks the database and that every `S3_*` variable above is set (it does not contact the bucket), so Railway keeps the previous deployment live when either is missing. A failure logs `health.failed` with the cause.
 2. Run `npm run storage:check` in the deployed service context to verify bucket access.
 3. Sign in at `/admin`, save an entry, and open its URL and images in an incognito browser.
 4. Redeploy the application and verify the same post and images are still available.

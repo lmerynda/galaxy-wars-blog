@@ -7,7 +7,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { StorageConfigurationError } from "./diagnostics";
 let client: S3Client | undefined;
-function storage() {
+// Reads settings only; the health check uses it so a deploy without bucket variables never goes live.
+export function storageConfig() {
   const {
     S3_ENDPOINT,
     S3_REGION,
@@ -33,6 +34,22 @@ function storage() {
         .filter(([, value]) => !value)
         .map(([name]) => name),
     );
+  return {
+    S3_ENDPOINT,
+    S3_REGION,
+    S3_BUCKET,
+    S3_ACCESS_KEY_ID,
+    S3_SECRET_ACCESS_KEY,
+  };
+}
+function storage() {
+  const {
+    S3_ENDPOINT,
+    S3_REGION,
+    S3_BUCKET,
+    S3_ACCESS_KEY_ID,
+    S3_SECRET_ACCESS_KEY,
+  } = storageConfig();
   client ??= new S3Client({
     endpoint: S3_ENDPOINT,
     region: S3_REGION,

@@ -6,6 +6,7 @@ import { handleApi } from "../../src/server/api";
 import { db, closeDb } from "../../src/server/db";
 import { deleteObject } from "../../src/server/storage";
 import { mediaResponse, readImage } from "../../src/server/images";
+import { healthResponse } from "../../src/server/health";
 import { sessionValid } from "../../src/server/auth";
 
 const token = "api-integration-only-" + "a".repeat(64);
@@ -250,6 +251,33 @@ it("serves media, logs storage failures and treats missing objects as 404", asyn
   } finally {
     log.mockRestore();
   }
+});
+
+it("fails the health check while storage variables are missing or empty", async () => {
+  const ok = await healthResponse();
+  expect(ok.status).toBe(200);
+  expect(await ok.json()).toEqual({ status: "ok" });
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  const { S3_REGION, S3_BUCKET } = process.env;
+  process.env.S3_REGION = "";
+  delete process.env.S3_BUCKET;
+  try {
+    const failed = await healthResponse();
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toEqual({ status: "unavailable" });
+    expect(JSON.parse(log.mock.calls.at(-1)![0])).toEqual({
+      event: "health.failed",
+      error: {
+        name: "StorageConfigurationError",
+        missingVariables: ["S3_REGION", "S3_BUCKET"],
+      },
+    });
+  } finally {
+    process.env.S3_REGION = S3_REGION;
+    process.env.S3_BUCKET = S3_BUCKET;
+    log.mockRestore();
+  }
+  expect((await healthResponse()).status).toBe(200);
 });
 
 it("accepts an ordered API gallery without legacy pair fields", async () => {
