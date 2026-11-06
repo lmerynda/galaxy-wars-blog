@@ -84,12 +84,14 @@ export async function publicDays(page = 1) {
       )
     : [];
   return {
-    days: days.map((day) => ({
-      ...day,
-      image: covers
-        .find((post) => post.publishedDay === day.day)
-        ?.images.at(-1),
-    })),
+    days: days.map((day) => {
+      const cover = covers.find((post) => post.publishedDay === day.day);
+      return {
+        ...day,
+        image: cover?.images.at(-1),
+        images: cover?.images.slice(0, 4) ?? [],
+      };
+    }),
     hasMore: summaries.length > 12,
   };
 }

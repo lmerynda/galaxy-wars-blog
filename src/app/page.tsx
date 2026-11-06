@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { publicDays } from "@/server/posts";
 import { dayUrl, formatDay } from "@/lib/day";
+import { currentConcept } from "@/server/concept";
+import { ConceptHome } from "@/concepts/views";
 export const dynamic = "force-dynamic";
 export default async function Home({
   searchParams,
@@ -11,6 +13,16 @@ export default async function Home({
   const page =
     raw && /^\d+$/.test(raw) ? Math.max(1, Math.min(100000, Number(raw))) : 1;
   const { days, hasMore } = await publicDays(page);
+  const concept = await currentConcept();
+  if (concept !== "current")
+    return (
+      <ConceptHome
+        concept={concept}
+        days={days}
+        page={page}
+        hasMore={hasMore}
+      />
+    );
   return (
     <>
       <section className="home-hero">

@@ -1,0 +1,385 @@
+/* Concept: HUD. The blog wears the game's flight interface. */
+:root[data-concept="hud"] {
+  --bg: #03080c;
+  --panel: rgba(6, 24, 32, 0.82);
+  --line: rgba(63, 198, 224, 0.3);
+  --text: #ddeff4;
+  --muted: #86a9b3;
+  --accent: #5fe3f5;
+  --edge: #2fb6cf;
+  --ready: #57e39b;
+  --cut: 14px;
+  --chamfer: polygon(
+    var(--cut) 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% calc(100% - var(--cut)),
+    calc(100% - var(--cut)) 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut)),
+    0 var(--cut)
+  );
+  font-family: var(--font-barlow), "Segoe UI", sans-serif;
+}
+[data-concept="hud"] body {
+  background: var(--bg);
+}
+[data-concept="hud"] .backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(rgba(3, 8, 12, 0.35), rgba(3, 8, 12, 0.55)),
+    url(/game/sector-frontier.webp) center / cover no-repeat;
+}
+[data-concept="hud"] :is(h1, h2, h3) {
+  font-family: var(--font-barlow), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+/* The game's panel: chamfered corners, 1px cyan edge, dark teal glass. */
+[data-concept="hud"]
+  :is(
+    .hud-panel,
+    .brand,
+    .comment-counter,
+    .day-entry,
+    .discussion,
+    .hud-day-header,
+    .day-contents a,
+    .button
+  ) {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+[data-concept="hud"]
+  :is(
+    .hud-panel,
+    .brand,
+    .comment-counter,
+    .day-entry,
+    .discussion,
+    .hud-day-header,
+    .day-contents a,
+    .button
+  )::before,
+[data-concept="hud"]
+  :is(
+    .hud-panel,
+    .brand,
+    .comment-counter,
+    .day-entry,
+    .discussion,
+    .hud-day-header,
+    .day-contents a,
+    .button
+  )::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  clip-path: var(--chamfer);
+  pointer-events: none;
+}
+[data-concept="hud"]
+  :is(
+    .hud-panel,
+    .brand,
+    .comment-counter,
+    .day-entry,
+    .discussion,
+    .hud-day-header,
+    .day-contents a,
+    .button
+  )::before {
+  inset: 0;
+  background: var(--edge);
+  transition: background-color 0.15s;
+}
+[data-concept="hud"]
+  :is(
+    .hud-panel,
+    .brand,
+    .comment-counter,
+    .day-entry,
+    .discussion,
+    .hud-day-header,
+    .day-contents a,
+    .button
+  )::after {
+  inset: 1px;
+  background: linear-gradient(rgba(10, 40, 52, 0.9), rgba(4, 18, 26, 0.9));
+  backdrop-filter: blur(6px);
+}
+[data-concept="hud"] :is(.comment-counter, .day-contents a, .button) {
+  --cut: 8px;
+}
+[data-concept="hud"]
+  :is(.mission, .day-contents a, .button, .comment-counter):is(
+    :hover,
+    :focus-visible
+  )::before {
+  background: var(--accent);
+}
+[data-concept="hud"] :focus-visible {
+  outline-color: var(--accent);
+}
+/* Chamfered controls show focus on their edge instead of an outline. */
+[data-concept="hud"]
+  :is(
+    .mission,
+    .day-contents a,
+    .button,
+    .comment-counter,
+    .brand
+  ):focus-visible {
+  outline: none;
+}
+[data-concept="hud"] .brand:focus-visible::before {
+  background: var(--accent);
+}
+[data-concept="hud"] .hud-panel-title {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-family: var(--font-barlow-semi), sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Header: pilot panel left, missions right */
+[data-concept="hud"] .site-header {
+  border-bottom: 0;
+}
+[data-concept="hud"] .brand {
+  padding: 12px 28px 12px 20px;
+  font-family: var(--font-barlow-semi), sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+[data-concept="hud"] .brand-sub {
+  color: var(--muted);
+}
+[data-concept="hud"] .brand-icon {
+  color: var(--accent);
+}
+[data-concept="hud"] .comment-counter {
+  padding: 9px 16px;
+  color: var(--text);
+}
+[data-concept="hud"] .header-note {
+  display: none;
+}
+
+/* Home */
+.hud-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 12px 48px;
+  margin: 24px 0 36px;
+  padding: 26px 32px 30px;
+}
+.hud-hero .hud-panel-title,
+.hud-hero h1,
+.hud-hero .lede {
+  grid-column: 1;
+}
+.hud-hero h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 4.4vw, 3.4rem);
+  line-height: 1.05;
+}
+.hud-hero .lede {
+  max-width: 56ch;
+  color: var(--muted);
+}
+.hud-readout {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: end;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 18px 28px;
+  margin: 0;
+}
+.hud-readout dt {
+  color: var(--muted);
+  font-family: var(--font-barlow-semi), sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.hud-readout dd {
+  margin: 2px 0 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hud-ready {
+  color: var(--ready);
+}
+.mission-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  margin: 0;
+  padding: 0;
+}
+.mission {
+  display: block;
+  height: 100%;
+  padding: 18px 22px 22px;
+}
+.mission-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.mission-title .hud-ready {
+  font-weight: 500;
+}
+.lock {
+  position: relative;
+  display: block;
+  margin: 18px 6px 16px;
+}
+.lock img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+/* Target-lock brackets: they close in when the mission is selected. */
+.lock::after {
+  --b: var(--muted);
+  content: "";
+  position: absolute;
+  inset: -6px;
+  background:
+    linear-gradient(var(--b), var(--b)) top left / 20px 2px no-repeat,
+    linear-gradient(var(--b), var(--b)) top left / 2px 20px no-repeat,
+    linear-gradient(var(--b), var(--b)) top right / 20px 2px no-repeat,
+    linear-gradient(var(--b), var(--b)) top right / 2px 20px no-repeat,
+    linear-gradient(var(--b), var(--b)) bottom left / 20px 2px no-repeat,
+    linear-gradient(var(--b), var(--b)) bottom left / 2px 20px no-repeat,
+    linear-gradient(var(--b), var(--b)) bottom right / 20px 2px no-repeat,
+    linear-gradient(var(--b), var(--b)) bottom right / 2px 20px no-repeat;
+  transition: inset 0.18s ease-out;
+}
+.mission:is(:hover, :focus-visible) .lock::after {
+  --b: var(--accent);
+  inset: -2px;
+}
+.hud-home .concept-titles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hud-home .concept-titles li {
+  padding: 3px 0;
+}
+.hud-home .concept-more {
+  color: var(--muted);
+}
+
+/* Day page */
+[data-concept="hud"] .hud-day-header {
+  max-width: none;
+  margin: 24px 0 36px;
+  padding: 26px 32px;
+  text-align: left;
+}
+[data-concept="hud"] .hud-day-header h1 {
+  margin: 0 0 6px;
+  font-size: clamp(2.2rem, 4.4vw, 3.4rem);
+}
+[data-concept="hud"] .day-contents {
+  margin: 22px 0 0;
+  max-width: none;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+[data-concept="hud"] .day-contents a {
+  grid-template-columns: 22px 1fr;
+  padding: 12px 16px;
+}
+[data-concept="hud"] .day-contents a > span {
+  color: var(--ready);
+}
+[data-concept="hud"] .day-entry {
+  padding: 28px 34px 34px;
+}
+[data-concept="hud"] .day-entry + .day-entry {
+  margin-top: 28px;
+}
+[data-concept="hud"] .post-header {
+  max-width: none;
+  text-align: left;
+}
+[data-concept="hud"] .post-header .eyebrow {
+  color: var(--ready);
+  font-family: var(--font-barlow-semi), sans-serif;
+  font-size: 0.85rem;
+}
+[data-concept="hud"] .day-entry h2 {
+  margin: 8px 0;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+}
+[data-concept="hud"] .post-copy {
+  max-width: 72ch;
+  margin: 24px 0 32px;
+  color: #c3dbe2;
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+[data-concept="hud"] .screenshot {
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: rgba(2, 10, 14, 0.75);
+}
+[data-concept="hud"] .screenshot a {
+  background: #01060a;
+}
+[data-concept="hud"] .screenshot .eyebrow {
+  color: var(--accent);
+}
+[data-concept="hud"] .discussion {
+  padding: 28px;
+}
+[data-concept="hud"] .back-link:hover,
+[data-concept="hud"] .entry-permalink:hover {
+  color: var(--accent);
+}
+[data-concept="hud"] .star-mark {
+  color: var(--accent);
+}
+@media (max-width: 760px) {
+  .hud-hero {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+  .hud-readout {
+    grid-column: 1;
+    grid-row: auto;
+    grid-template-columns: repeat(2, auto);
+    justify-content: start;
+  }
+  .mission-grid {
+    grid-template-columns: 1fr;
+  }
+  [data-concept="hud"] .day-entry {
+    padding: 22px 20px 26px;
+  }
+  [data-concept="hud"] .brand {
+    padding: 10px 18px 10px 14px;
+  }
+}

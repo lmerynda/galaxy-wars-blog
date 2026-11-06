@@ -2,6 +2,12 @@ import { CommentCounter } from "@/components/CommentCounter";
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import "@/concepts/sector.css";
+import "@/concepts/hud.css";
+import "@/concepts/hangar.css";
+import "@/concepts/title.css";
+import { fontVariables } from "./fonts";
+import { currentConcept } from "@/server/concept";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
   title: {
@@ -11,10 +17,19 @@ export const metadata: Metadata = {
   description:
     "Building Galaxy Wars, one change at a time. Small stories, real screenshots, and a galaxy taking shape.",
 };
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default async function Layout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      data-concept={await currentConcept()}
+      className={fontVariables}
+    >
       <body>
+        <div className="backdrop" aria-hidden="true" />
         <a className="skip-link" href="#main">
           Skip to content
         </a>

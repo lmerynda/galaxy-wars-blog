@@ -1,0 +1,299 @@
+/* Concept: Sector. Every day is one of the game's sectors. */
+:root[data-concept="sector"] {
+  --bg: #05070b;
+  --panel: rgba(10, 14, 22, 0.86);
+  --line: rgba(200, 215, 235, 0.14);
+  --text: #e9eef5;
+  --muted: #93a0b4;
+  --accent: #5fd4ff;
+  --sector-image: url(/game/sector-frontier.webp);
+  --sector-image-small: url(/game/sector-frontier-small.webp);
+  font-family: var(--font-plex), "Segoe UI", sans-serif;
+}
+:root[data-concept="sector"] [data-sector="mining"],
+:root[data-concept="sector"]:has(
+    :is(.sector-home, .day-page)[data-sector="mining"]
+  ) {
+  --accent: #f0b04a;
+  --sector-image: url(/game/sector-mining.webp);
+  --sector-image-small: url(/game/sector-mining-small.webp);
+}
+:root[data-concept="sector"] [data-sector="frontier"],
+:root[data-concept="sector"]:has(
+    :is(.sector-home, .day-page)[data-sector="frontier"]
+  ) {
+  --accent: #5fd4ff;
+  --sector-image: url(/game/sector-frontier.webp);
+  --sector-image-small: url(/game/sector-frontier-small.webp);
+}
+:root[data-concept="sector"] [data-sector="redspace"],
+:root[data-concept="sector"]:has(
+    :is(.sector-home, .day-page)[data-sector="redspace"]
+  ) {
+  --accent: #ff5fa2;
+  --sector-image: url(/game/sector-redspace.webp);
+  --sector-image-small: url(/game/sector-redspace-small.webp);
+}
+:root[data-concept="sector"] [data-sector="storm"],
+:root[data-concept="sector"]:has(
+    :is(.sector-home, .day-page)[data-sector="storm"]
+  ) {
+  --accent: #ff8a4c;
+  --sector-image: url(/game/sector-storm.webp);
+  --sector-image-small: url(/game/sector-storm-small.webp);
+}
+[data-concept="sector"] body {
+  background: var(--bg);
+}
+[data-concept="sector"] .backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(
+      ellipse 75% 70% at 40% 40%,
+      rgba(5, 7, 11, 0.55),
+      rgba(5, 7, 11, 0.15) 100%
+    ),
+    var(--sector-image) center / cover no-repeat;
+  transition: background-image 0.4s;
+}
+[data-concept="sector"]:has(.day-page) .backdrop {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(5, 7, 11, 0.45),
+      rgba(5, 7, 11, 0.93) 22% 78%,
+      rgba(5, 7, 11, 0.45)
+    ),
+    var(--sector-image) center / cover no-repeat;
+}
+[data-concept="sector"] :is(h1, h2, h3, .brand) {
+  font-family: var(--font-saira), sans-serif;
+  font-stretch: 112.5%;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+[data-concept="sector"] .brand-icon {
+  width: 14px;
+  height: 14px;
+  font-size: 0;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 14px var(--accent);
+}
+[data-concept="sector"] .header-note,
+[data-concept="sector"] .status-dot {
+  display: none;
+}
+[data-concept="sector"] :focus-visible {
+  outline-color: var(--accent);
+}
+
+/* Home: the jump route */
+.sector-hero {
+  max-width: 780px;
+  padding: 64px 0 56px;
+}
+.sector-now {
+  margin: 0 0 18px;
+  color: var(--accent);
+  font-size: 0.95rem;
+}
+.sector-now strong {
+  font-weight: 600;
+}
+.sector-hero h1 {
+  margin: 0 0 22px;
+  font-size: clamp(2.6rem, 6.2vw, 4.8rem);
+  line-height: 1.02;
+  text-wrap: balance;
+}
+.sector-hero .lede {
+  max-width: 54ch;
+  color: #b8c3d3;
+  font-size: 1.08rem;
+}
+.route {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 40px;
+}
+.waypoint {
+  position: relative;
+  padding-bottom: 48px;
+}
+.waypoint::before {
+  content: "";
+  position: absolute;
+  left: -31px;
+  top: 26px;
+  bottom: -4px;
+  width: 2px;
+  background: linear-gradient(
+    var(--accent),
+    color-mix(in srgb, var(--accent) 15%, transparent)
+  );
+}
+.waypoint:last-child::before {
+  display: none;
+}
+.waypoint > a {
+  display: block;
+}
+.waypoint-node {
+  position: absolute;
+  left: -40px;
+  top: 6px;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 0 22px var(--accent);
+}
+.waypoint-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 18px;
+}
+.waypoint-head time {
+  font-family: var(--font-saira), sans-serif;
+  font-stretch: 112.5%;
+  font-weight: 600;
+  font-size: 1.65rem;
+  line-height: 1.25;
+}
+.waypoint-sector {
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.waypoint-count {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.sector-home .concept-titles {
+  list-style: none;
+  max-width: 68ch;
+  margin: 8px 0 18px;
+  padding: 0;
+  color: #c9d3e0;
+}
+.sector-home .concept-titles li + li {
+  margin-top: 4px;
+}
+.sector-home .concept-more {
+  color: var(--muted);
+}
+.waypoint-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 860px;
+}
+.waypoint-strip img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  transition: border-color 0.2s;
+}
+.waypoint > a:is(:hover, :focus-visible) time {
+  color: var(--accent);
+}
+.waypoint > a:is(:hover, :focus-visible) img {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+/* Day page */
+[data-concept="sector"] .day-header {
+  max-width: 760px;
+  margin: 24px 0 56px;
+  text-align: left;
+}
+[data-concept="sector"] .day-header h1 {
+  margin: 0 0 10px;
+}
+[data-concept="sector"] .day-header .lede {
+  color: var(--muted);
+}
+[data-concept="sector"] .day-contents {
+  margin: 28px 0 0;
+}
+[data-concept="sector"] .day-contents a {
+  grid-template-columns: 24px 1fr;
+  border-radius: 3px;
+  background: rgba(5, 7, 11, 0.6);
+}
+[data-concept="sector"] .day-contents a:hover {
+  border-color: var(--accent);
+}
+[data-concept="sector"] .day-entry {
+  border-top: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+[data-concept="sector"] .post-header {
+  max-width: 760px;
+  margin-left: 0;
+  text-align: left;
+}
+[data-concept="sector"] .post-header .eyebrow {
+  color: var(--accent);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 0.85rem;
+}
+[data-concept="sector"] .post-copy {
+  max-width: 68ch;
+  margin-left: 0;
+  color: #c9d3e0;
+}
+[data-concept="sector"] .screenshot {
+  border-radius: 3px;
+  background: rgba(5, 7, 11, 0.8);
+}
+[data-concept="sector"] .screenshot a {
+  background: #020305;
+}
+[data-concept="sector"] .back-link:hover,
+[data-concept="sector"] .entry-permalink:hover {
+  color: var(--accent);
+}
+[data-concept="sector"] .star-mark {
+  color: var(--accent);
+}
+@media (max-width: 700px) {
+  [data-concept="sector"] .backdrop {
+    background-image:
+      radial-gradient(
+        ellipse 90% 60% at 50% 30%,
+        rgba(5, 7, 11, 0.6),
+        rgba(5, 7, 11, 0.25)
+      ),
+      var(--sector-image-small);
+  }
+  .sector-hero {
+    padding: 36px 0 36px;
+  }
+  .route {
+    padding-left: 30px;
+  }
+  .waypoint::before {
+    left: -22px;
+  }
+  .waypoint-node {
+    left: -30px;
+    width: 18px;
+    height: 18px;
+  }
+  .waypoint-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

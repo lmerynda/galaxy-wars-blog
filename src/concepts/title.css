@@ -1,0 +1,293 @@
+/* Concept: Title screen. The home page is the game's main menu. */
+:root[data-concept="title"] {
+  --bg: #0f0b09;
+  --panel: #1a1411;
+  --line: rgba(243, 233, 220, 0.12);
+  --text: #f3e9dc;
+  --muted: #b3a593;
+  --accent: #9cc3ff;
+  --dust: #c9a27a;
+  font-family: var(--font-manrope), "Segoe UI", sans-serif;
+}
+[data-concept="title"] body {
+  background: var(--bg);
+}
+[data-concept="title"] :is(h1, h2, h3) {
+  font-family: var(--font-unbounded), sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+[data-concept="title"] .brand {
+  font-family: var(--font-unbounded), sans-serif;
+  font-weight: 600;
+}
+[data-concept="title"] .brand-icon {
+  color: var(--dust);
+}
+[data-concept="title"] .comment-counter {
+  border-color: rgba(243, 233, 220, 0.3);
+}
+[data-concept="title"] .comment-counter strong {
+  background: var(--dust);
+}
+[data-concept="title"] .status-dot {
+  background: var(--accent);
+}
+[data-concept="title"] :focus-visible {
+  outline-color: var(--accent);
+}
+/* On the title screen the logo replaces the header brand. */
+[data-concept="title"]:has(.title-screen) .site-header {
+  position: relative;
+  z-index: 2;
+  border-bottom: 0;
+}
+[data-concept="title"]:has(.title-screen) .brand {
+  visibility: hidden;
+}
+
+/* Home: title screen */
+.title-screen {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-content: end;
+  min-height: 100vh;
+  margin: -116px calc(50% - 50vw) 0;
+  padding: 140px max(24px, calc(50vw - 600px)) 12vh;
+  overflow: hidden;
+}
+.title-pan {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to top, var(--bg) 0%, rgba(15, 11, 9, 0) 45%),
+    linear-gradient(90deg, rgba(15, 11, 9, 0.85), rgba(15, 11, 9, 0) 65%),
+    url(/game/carina.webp) 0% 50% / auto 100% no-repeat;
+  animation: title-pan 90s ease-in-out infinite alternate;
+}
+@keyframes title-pan {
+  to {
+    background-position:
+      0 0,
+      0 0,
+      100% 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .title-pan {
+    animation: none;
+  }
+}
+.title-logo h1 {
+  margin: 0;
+  font-size: clamp(3.4rem, 10vw, 8.6rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+.title-logo p {
+  margin: 14px 0 0;
+  color: var(--dust);
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  font-weight: 400;
+}
+.title-menu {
+  display: grid;
+  gap: 2px;
+  width: min(440px, 100%);
+  margin-top: 56px;
+}
+.title-menu a {
+  position: relative;
+  padding: 10px 0 10px 34px;
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 1.45rem;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.title-menu a span {
+  display: block;
+  color: var(--muted);
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+/* Selection marker: sits on the first item until another is hovered or focused. */
+.title-menu a::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 21px;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 12px solid var(--accent);
+  opacity: 0;
+  transform: translateX(-10px);
+  transition:
+    opacity 0.15s,
+    transform 0.15s ease-out;
+}
+.title-menu a:is(:hover, :focus-visible),
+.title-menu:not(:has(a:is(:hover, :focus-visible))) a:first-child {
+  color: var(--accent);
+}
+.title-menu a:is(:hover, :focus-visible)::before,
+.title-menu:not(:has(a:is(:hover, :focus-visible))) a:first-child::before {
+  opacity: 1;
+  transform: none;
+}
+.title-menu a:focus-visible {
+  outline: none;
+}
+
+/* Home: save slots */
+.saves {
+  padding-top: 72px;
+}
+.saves h2 {
+  margin: 0 0 24px;
+  font-size: 1.6rem;
+}
+.saves ol {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+.save-slot {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 24px 10px 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(90deg, var(--panel), rgba(26, 20, 17, 0.4));
+  transition: border-color 0.15s;
+}
+.save-slot img,
+.save-blank {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #000;
+}
+.save-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.save-body time {
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+.save-title {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.save-count {
+  color: var(--dust);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.save-slot:is(:hover, :focus-visible) {
+  border-color: var(--accent);
+  outline: none;
+}
+.save-slot:is(:hover, :focus-visible) time {
+  color: var(--accent);
+}
+
+/* Day page: a chapter with the nebula as its title plate */
+[data-concept="title"] .title-day-header {
+  max-width: none;
+  margin: -30px calc(50% - 50vw) 64px;
+  padding: 120px max(24px, calc(50vw - 420px)) 48px;
+  background:
+    linear-gradient(to top, var(--bg), rgba(15, 11, 9, 0.35)),
+    url(/game/carina.webp) 50% 40% / cover no-repeat;
+}
+[data-concept="title"] .title-day-header h1 {
+  margin: 0 0 12px;
+  font-size: clamp(2.2rem, 5.4vw, 4rem);
+}
+[data-concept="title"] .title-day-header .lede {
+  color: var(--dust);
+}
+[data-concept="title"] .day-contents a {
+  grid-template-columns: 24px 1fr;
+  border-radius: 0;
+  background: rgba(15, 11, 9, 0.6);
+}
+[data-concept="title"] .day-contents a:hover {
+  border-color: var(--accent);
+}
+[data-concept="title"] .day-contents a > span,
+[data-concept="title"] .post-header .eyebrow {
+  color: var(--dust);
+}
+[data-concept="title"] .post-header .eyebrow {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.85rem;
+}
+[data-concept="title"] .day-entry h2 {
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1.2;
+}
+[data-concept="title"] .post-copy {
+  color: #d6cabb;
+}
+[data-concept="title"] .screenshot {
+  border-radius: 0;
+  background: #140f0d;
+}
+[data-concept="title"] .screenshot a {
+  background: #080605;
+}
+[data-concept="title"] .screenshot .eyebrow {
+  color: var(--dust);
+}
+[data-concept="title"] .discussion,
+[data-concept="title"] .button {
+  border-radius: 0;
+}
+[data-concept="title"] .back-link:hover,
+[data-concept="title"] .entry-permalink:hover {
+  color: var(--accent);
+}
+[data-concept="title"] .star-mark {
+  color: var(--dust);
+}
+@media (max-width: 700px) {
+  .title-screen {
+    margin-top: -94px;
+    min-height: 100svh;
+    padding-top: 110px;
+  }
+  .title-pan {
+    background-size:
+      auto,
+      auto,
+      auto 100%;
+  }
+  .save-slot {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 14px;
+    padding-right: 14px;
+  }
+  .save-count {
+    grid-column: 2;
+  }
+  [data-concept="title"] .title-day-header {
+    padding-top: 90px;
+  }
+}
