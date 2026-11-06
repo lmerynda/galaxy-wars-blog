@@ -80,6 +80,8 @@ Set these **application service** variables using Railway resource references wh
 | `S3_FORCE_PATH_STYLE`  | `false` for Railway; `true` for the local MinIO service                                             |
 | `TRUST_RAILWAY_PROXY`  | `true` only when all public requests arrive through Railway's edge                                  |
 
+Railway's bucket **Connect Service to Bucket** dialog defaults to `AWS_ENDPOINT_URL`, `AWS_S3_BUCKET_NAME`, `AWS_DEFAULT_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Rename each one to the exact `S3_*` name above, or set references by hand, such as `S3_BUCKET=${{<bucket>.BUCKET}}`, with `ENDPOINT`, `REGION`, `ACCESS_KEY_ID` and `SECRET_ACCESS_KEY` for the others. If any are missing or empty, `/media` returns 503 and logs `media.read.failed` with `missingVariables`.
+
 Railway documents `X-Real-IP` as its client IP header. The application uses it only with explicit proxy trust; otherwise sign-in attempts share a conservative client limit. Check that spoofed headers are overwritten at your deployed edge before enabling trust. Rate limits and session tokens persist in PostgreSQL across restarts. Five attempts per client per 15 minutes and a 100-attempt service ceiling bound password verification; successful sign-in clears the client counter.
 
 Password hashes and all storage credentials stay server-side. Session cookies are HTTP-only, SameSite=Lax, and Secure in production, with seven-day absolute expiry. Restart/redeploy after replacing `ADMIN_PASSWORD_HASH`; sessions created with the previous hash become invalid. Mutations require the configured origin and an owner session.
