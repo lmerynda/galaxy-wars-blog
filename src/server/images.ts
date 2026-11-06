@@ -6,7 +6,7 @@ import { db } from "./db";
 import { requireOwner, sessionValid, type OwnerCredential } from "./auth";
 import { deleteObject, getObject, putObject } from "./storage";
 import { InputError, type PostImage } from "../lib/post";
-import { OperationError } from "./diagnostics";
+import { OperationError, errorDetails } from "./diagnostics";
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export async function inspectImage(bytes: Buffer, mime: string) {
   if (!bytes.length || bytes.length > MAX_IMAGE_BYTES)
@@ -85,12 +85,58 @@ export async function readImage(id: string, token?: string) {
   const [row] =
     await db()`select i.object_key, i.mime, i.bytes, (i.post_id is not null and i.active) as public from post_images i where i.id = ${id}`;
   if (!row || (!row.public && !(await sessionValid(token)))) return null;
-  const result = await getObject(row.object_key);
+  let result;
+  try {
+    result = await getObject(row.object_key);
+  } catch (error) {
+    // The row exists but its object is gone: a missing screenshot, not an outage.
+    if ((error as { name?: string })?.name === "NoSuchKey") {
+      console.error(
+        JSON.stringify({ event: "media.object.missing", imageId: id }),
+      );
+      return null;
+    }
+    throw new OperationError("storage.getObject", error);
+  }
   return {
     body: result.Body?.transformToWebStream(),
     mime: row.mime as string,
     bytes: row.bytes as number,
   };
+}
+export async function mediaResponse(id: string, token?: string) {
+  const started = Date.now();
+  try {
+    const image = await readImage(id, token);
+    if (!image?.body)
+      return new Response("Not found", {
+        status: 404,
+        headers: { "Cache-Control": "no-store" },
+      });
+    return new Response(image.body as ReadableStream, {
+      headers: {
+        "Content-Type": image.mime,
+        "Content-Length": String(image.bytes),
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+      },
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "media.read.failed",
+        imageId: z.uuid().safeParse(id).success ? id : undefined,
+        status: 503,
+        durationMs: Date.now() - started,
+        error: errorDetails(error),
+      }),
+    );
+    return new Response("Screenshot unavailable", {
+      status: 503,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
 }
 export async function cleanupStorage() {
   const rows =

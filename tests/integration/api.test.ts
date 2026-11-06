@@ -5,7 +5,7 @@ import { prepareTestDatabase } from "../support/database";
 import { handleApi } from "../../src/server/api";
 import { db, closeDb } from "../../src/server/db";
 import { deleteObject } from "../../src/server/storage";
-import { readImage } from "../../src/server/images";
+import { mediaResponse, readImage } from "../../src/server/images";
 import { sessionValid } from "../../src/server/auth";
 
 const token = "api-integration-only-" + "a".repeat(64);
@@ -186,6 +186,70 @@ it("uploads before creating entries and edits publicly with safe retries", async
   process.env.BLOG_API_TOKEN = "rotated-" + token;
   expect((await call(["posts", post.id], "GET")).status).toBe(401);
   process.env.BLOG_API_TOKEN = token;
+});
+
+it("serves media, logs storage failures and treats missing objects as 404", async () => {
+  const png = await sharp({
+    create: { width: 32, height: 32, channels: 3, background: "#456789" },
+  })
+    .png()
+    .toBuffer();
+  const { image } = await (
+    await handleApi(
+      new Request("http://localhost/api/v1/images", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "image/png",
+          "idempotency-key": randomUUID(),
+        },
+        body: png,
+      }),
+      ["images"],
+    )
+  ).json();
+  await call(["posts"], "POST", {
+    ...entry,
+    title: "media-serving",
+    images: [{ id: image.id, alt: "Shot" }],
+  });
+  const served = await mediaResponse(image.id);
+  expect(served.status).toBe(200);
+  expect(served.headers.get("content-type")).toBe("image/png");
+  expect(Buffer.from(await served.arrayBuffer()).equals(png)).toBe(true);
+
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  const bucket = process.env.S3_BUCKET;
+  delete process.env.S3_BUCKET;
+  try {
+    const failed = await mediaResponse(image.id);
+    expect(failed.status).toBe(503);
+    expect(JSON.parse(log.mock.calls.at(-1)![0])).toMatchObject({
+      event: "media.read.failed",
+      imageId: image.id,
+      status: 503,
+      error: {
+        name: "OperationError",
+        operation: "storage.getObject",
+        cause: { missingVariables: ["S3_BUCKET"] },
+      },
+    });
+  } finally {
+    process.env.S3_BUCKET = bucket;
+  }
+
+  const [row] =
+    await db()`select object_key from post_images where id = ${image.id}`;
+  await deleteObject(row.object_key);
+  try {
+    expect((await mediaResponse(image.id)).status).toBe(404);
+    expect(JSON.parse(log.mock.calls.at(-1)![0])).toEqual({
+      event: "media.object.missing",
+      imageId: image.id,
+    });
+  } finally {
+    log.mockRestore();
+  }
 });
 
 it("accepts an ordered API gallery without legacy pair fields", async () => {
